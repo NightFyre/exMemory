@@ -1,8 +1,11 @@
 #pragma once
 #include <windows.h>
+#include <TlHelp32.h>
+#include <Psapi.h>
 #include <memory>
-#include <string>
 #include <vector>
+
+#include <StringHelper.h>	
 
 //	architechture type helpers
 #ifdef _WIN64
@@ -314,10 +317,13 @@ private://	tools
 	static BOOL CALLBACK GetProcWindowEx(HWND handle, LPARAM lParam);
 };
 
-#include <TlHelp32.h>
-#include <Psapi.h>
 
-#include <StringHelper.h>
+
+//-------------------------------------------------------------------------------------------------
+//
+//										CONSTRUCTORS
+//
+//-------------------------------------------------------------------------------------------------
 
 exMemory::exMemory(const std::string& name)
 {
@@ -337,6 +343,7 @@ exMemory::~exMemory()
 
 //-------------------------------------------------------------------------------------------------
 //
+//										INSTANCE METHODS								
 //
 //-------------------------------------------------------------------------------------------------
 
@@ -374,6 +381,7 @@ void exMemory::update()
 
 //-------------------------------------------------------------------------------------------------
 //
+//										INSTANCE METHODS	( MEMORY OPERATIONS )							
 //
 //-------------------------------------------------------------------------------------------------
 
@@ -408,6 +416,22 @@ bool exMemory::ReadString(const i64_t& addr, std::string& string, const DWORD& s
 	return ReadStringEx(vmProcess.hProc, addr, szString, &string);
 }
 
+bool exMemory::WriteMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite)
+{
+	if (!IsValidInstance())
+		return false;
+
+	return WriteMemoryEx(vmProcess.hProc, addr, &buffer, szWrite);
+}
+
+bool exMemory::PatchMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite)
+{
+	if (!IsValidInstance())
+		return false;
+
+	return PatchMemoryEx(vmProcess.hProc, addr, buffer, szWrite);
+}
+
 i64_t exMemory::ReadPointerChain(const i64_t& addr, std::vector<unsigned int>& offsets, i64_t* lpResult)
 {
 	if (!IsValidInstance())
@@ -430,24 +454,9 @@ i64_t exMemory::FindPattern(const std::string& signature, i64_t* result, int pad
 	return *result;
 }
 
-bool exMemory::WriteMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite)
-{
-	if (!IsValidInstance())
-		return false;
-
-	return WriteMemoryEx(vmProcess.hProc, addr, &buffer, szWrite);
-}
-
-bool exMemory::PatchMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite)
-{
-	if (!IsValidInstance())
-		return false;
-
-	return PatchMemoryEx(vmProcess.hProc, addr, buffer, szWrite);
-}
-
 //-------------------------------------------------------------------------------------------------
 //
+// 									STATIC METHODS
 //
 //-------------------------------------------------------------------------------------------------
 
@@ -470,6 +479,7 @@ bool exMemory::DetachEx(procInfo_t& pInfo)
 
 //-------------------------------------------------------------------------------------------------
 //
+// 									STATIC METHODS ( PROCESS INFORMATION )
 //
 //-------------------------------------------------------------------------------------------------
 
@@ -518,6 +528,63 @@ bool exMemory::IsProcessRunning(const std::string& name)
 
 //-------------------------------------------------------------------------------------------------
 //
+// 									STATIC METHODS ( BASIC MEMORY OPERATIONS )
+//
+//-------------------------------------------------------------------------------------------------
+
+bool exMemory::ReadMemoryEx(const HANDLE& hProc, const i64_t& addr, void* lpResult, size_t szRead)
+{
+	SIZE_T size_read{};
+	return ReadProcessMemory(hProc, LPCVOID(addr), lpResult, szRead, &size_read) && szRead == size_read;
+}
+
+bool exMemory::WriteMemoryEx(const HANDLE& hProc, const i64_t& addr, LPVOID buffer, DWORD szWrite)
+{
+	SIZE_T size_write{};
+	return WriteProcessMemory(hProc, LPVOID(addr), buffer, szWrite, &size_write) && szWrite == size_write;
+}
+
+bool exMemory::ReadStringEx(const HANDLE& hProc, const i64_t& addr, const size_t& szString, std::string* lpResult)
+{
+	size_t bytes_read{};
+	char buf[MAX_PATH]{};
+	if (!ReadMemoryEx(hProc, addr, buf, szString))
+		return false;
+
+	*lpResult = std::string(buf);
+
+	return true;
+}
+
+bool exMemory::ReadPointerChainEx(const HANDLE& hProc, const i64_t& addr, const std::vector<unsigned int>& offsets, i64_t* lpResult)
+{
+	i64_t result = addr;
+	for (unsigned int i = 0; i < offsets.size(); ++i)
+	{
+		result = ReadEx<i64_t>(hProc, result);
+		result += offsets[i];
+	}
+
+	*lpResult = result;
+
+	return result > 0;
+}
+
+bool exMemory::PatchMemoryEx(const HANDLE& hProc, const i64_t& addr, const void* buffer, const DWORD& szWrite)
+{
+	//	store original protection & set new protection
+	DWORD oldprotect;
+	if (!VirtualProtectEx(hProc, LPVOID(addr), szWrite, PAGE_EXECUTE_READWRITE, &oldprotect))
+		return false;
+
+	bool result = WriteProcessMemory(hProc, LPVOID(addr), buffer, szWrite, nullptr);			//	write bytes to address
+	VirtualProtectEx(hProc, LPVOID(addr), szWrite, oldprotect, &oldprotect);					//	restore memory protection
+	return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+//
+// 									STATIC METHODS ( PROCESS & MODULE ENUMERATION )
 //
 //-------------------------------------------------------------------------------------------------
 
@@ -749,6 +816,7 @@ bool exMemory::FindModuleEx(const std::string& procName, const std::string& modN
 
 //-------------------------------------------------------------------------------------------------
 //
+// 									STATIC METHODS ( ADVANCED MEMORY OPERATIONS )
 //
 //-------------------------------------------------------------------------------------------------
 
@@ -998,6 +1066,7 @@ bool exMemory::GetProcAddressEx(const HANDLE& hProc, const i64_t& dwModule, cons
 
 //-------------------------------------------------------------------------------------------------
 //
+// 									STATIC METHODS ( INJECTION OPERATIONS )
 //
 //-------------------------------------------------------------------------------------------------
 
@@ -1028,64 +1097,10 @@ bool exMemory::LoadLibraryInjectorEx(const HANDLE& hProc, const std::string& dll
 	return true;
 }
 
-//-------------------------------------------------------------------------------------------------
-//
-//
-//-------------------------------------------------------------------------------------------------
-
-bool exMemory::ReadMemoryEx(const HANDLE& hProc, const i64_t& addr, void* lpResult, size_t szRead)
-{
-	SIZE_T size_read{};
-	return ReadProcessMemory(hProc, LPCVOID(addr), lpResult, szRead, &size_read) && szRead == size_read;
-}
-
-bool exMemory::WriteMemoryEx(const HANDLE& hProc, const i64_t& addr, LPVOID buffer, DWORD szWrite)
-{
-	SIZE_T size_write{};
-	return WriteProcessMemory(hProc, LPVOID(addr), buffer, szWrite, &size_write) && szWrite == size_write;
-}
-
-bool exMemory::ReadStringEx(const HANDLE& hProc, const i64_t& addr, const size_t& szString, std::string* lpResult)
-{
-	size_t bytes_read{};
-	char buf[MAX_PATH]{};
-	if (!ReadMemoryEx(hProc, addr, buf, szString))
-		return false;
-
-	*lpResult = std::string(buf);
-
-	return true;
-}
-
-bool exMemory::ReadPointerChainEx(const HANDLE& hProc, const i64_t& addr, const std::vector<unsigned int>& offsets, i64_t* lpResult)
-{
-	i64_t result = addr;
-	for (unsigned int i = 0; i < offsets.size(); ++i)
-	{
-		result = ReadEx<i64_t>(hProc, result);
-		result += offsets[i];
-	}
-
-	*lpResult = result;
-
-	return result > 0;
-}
-
-bool exMemory::PatchMemoryEx(const HANDLE& hProc, const i64_t& addr, const void* buffer, const DWORD& szWrite)
-{
-	//	store original protection & set new protection
-	DWORD oldprotect;
-	if (!VirtualProtectEx(hProc, LPVOID(addr), szWrite, PAGE_EXECUTE_READWRITE, &oldprotect))
-		return false;
-
-	bool result = WriteProcessMemory(hProc, LPVOID(addr), buffer, szWrite, nullptr);			//	write bytes to address
-	VirtualProtectEx(hProc, LPVOID(addr), szWrite, oldprotect, &oldprotect);					//	restore memory protection
-	return result;
-}
-
 
 //-------------------------------------------------------------------------------------------------
 //
+// 									PRIVATE METHODS
 //
 //-------------------------------------------------------------------------------------------------
 
