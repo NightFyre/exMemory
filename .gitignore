@@ -1,0 +1,7 @@
+# ignore ide settings
+*.vs
+
+# ignore user settings
+*.sln
+*.vcxproj.user
+*.vcxproj.filters
