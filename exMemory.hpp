@@ -94,21 +94,19 @@ private:
 public:	//	
 
 	/* attempts to attach to a process by name */
-	bool Attach(const std::string& name, const DWORD& dwAccess = PROCESS_ALL_ACCESS);
+	virtual bool Attach(const std::string& name, const DWORD& dwAccess = PROCESS_ALL_ACCESS);
 
 	/* detaches from the attached process */
-	bool Detach();
+	virtual bool Detach();
 
 	/* verifies attached process is active & updates processinfo structure when needed */
-	void update();
+	virtual void update();
 
 	/* returns the process information structure */
 	const procInfo_t& GetProcessInfo() const { return vmProcess; }
 
 
 public:
-	/* gets an address relative to the input named module base address */
-	i64_t GetAddress(const unsigned int& offset, const std::string& modName = "");
 
 	/* reads a memory into a buffer at the specified address in the attached process
 	* returns true if all bytes were read
@@ -135,10 +133,19 @@ public:
 	*/
 	bool PatchMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite);
 
+	/* gets an address relative to the input named module base address */
+	i64_t GetAddress(const unsigned int& offset, i64_t* lpResult, const std::string& modName = "");
+
 	/* attempts to find a pattern in the attached process
 	* returns the address of pattern if found
 	*/
 	i64_t FindPattern(const std::string& signature, i64_t* result, int padding = 0, bool isRelative = false, EASM instruction = EASM::ASM_NULL);
+
+	/* attempts to find a section header address in the attached process*/
+	i64_t GetSectionHeader(const ESECTIONHEADERS& section, i64_t* lpResult);
+
+	/**/
+	i64_t GetProcAddress(const std::string& fnName, i64_t* lpResult);
 
 
 public:
@@ -385,21 +392,6 @@ void exMemory::update()
 //
 //-------------------------------------------------------------------------------------------------
 
-i64_t exMemory::GetAddress(const unsigned int& offset, const std::string& modName)
-{
-	if (!IsValidInstance())
-		return 0;
-
-	if (modName.empty())
-		return vmProcess.dwModuleBase + offset;
-
-	i64_t result = 0;
-	if (GetModuleAddressEx(vmProcess.hProc, modName, &result))
-		return result;
-
-	return 0;
-}
-
 bool exMemory::ReadMemory(const i64_t& addr, void* buffer, const DWORD& szRead)
 {
 	if (!IsValidInstance())
@@ -443,15 +435,51 @@ i64_t exMemory::ReadPointerChain(const i64_t& addr, std::vector<unsigned int>& o
 	return *lpResult;
 }
 
-i64_t exMemory::FindPattern(const std::string& signature, i64_t* result, int padding, bool isRelative, EASM instruction)
+i64_t exMemory::GetAddress(const unsigned int& offset, i64_t* lpResult, const std::string& modName)
 {
 	if (!IsValidInstance())
 		return 0;
 
-	if (!FindPatternEx(vmProcess.hProc, vmProcess.dwModuleBase, signature, result, padding, isRelative, instruction))
+	if (modName.empty())
+		return vmProcess.dwModuleBase + offset;
+
+	if (GetModuleAddressEx(vmProcess.hProc, modName, lpResult))
 		return 0;
 
-	return *result;
+	return *lpResult;
+}
+
+i64_t exMemory::FindPattern(const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction)
+{
+	if (!IsValidInstance())
+		return 0;
+
+	if (!FindPatternEx(vmProcess.hProc, vmProcess.dwModuleBase, signature, lpResult, padding, isRelative, instruction))
+		return 0;
+
+	return *lpResult;
+}
+
+i64_t exMemory::GetSectionHeader(const ESECTIONHEADERS& section, i64_t* lpResult)
+{
+	if (!IsValidInstance())
+		return 0;
+
+	if (GetSectionHeaderAddressEx(vmProcess.hProc, vmProcess.dwModuleBase, section, lpResult, nullptr))
+		return 0;
+
+	return *lpResult;
+}
+
+i64_t exMemory::GetProcAddress(const std::string& fnName, i64_t* lpResult)
+{
+	if (!IsValidInstance())
+		return 0; 
+	
+	if (!GetProcAddressEx(vmProcess.hProc, vmProcess.dwModuleBase, fnName, lpResult))
+		return 0;
+	
+	return *lpResult;
 }
 
 //-------------------------------------------------------------------------------------------------
