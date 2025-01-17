@@ -144,8 +144,11 @@ public:
 	/* attempts to find a section header address in the attached process*/
 	i64_t GetSectionHeader(const ESECTIONHEADERS& section, i64_t* lpResult);
 
-	/**/
+	/* attempts to obtain the address of a function located in the atteched processes export directory */
 	i64_t GetProcAddress(const std::string& fnName, i64_t* lpResult);
+
+	/* attempts to inject a module from disk into the attached process */
+	bool LoadLibraryInject(const std::string& dllPath);
 
 
 public:
@@ -480,6 +483,14 @@ i64_t exMemory::GetProcAddress(const std::string& fnName, i64_t* lpResult)
 		return 0;
 	
 	return *lpResult;
+}
+
+bool exMemory::LoadLibraryInject(const std::string& dllPath)
+{
+	if (!IsValidInstance())
+		return false;
+
+	return LoadLibraryInjectorEx(vmProcess.hProc, dllPath);
 }
 
 //-------------------------------------------------------------------------------------------------
