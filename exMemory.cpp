@@ -5,11 +5,6 @@
 
 #include <StringHelper.h>
 
-exMemory::exMemory()
-{
-
-}
-
 exMemory::exMemory(const std::string& name) 
 { 
 	bAttached = Attach(name, PROCESS_ALL_ACCESS); 
@@ -67,6 +62,21 @@ void exMemory::update()
 //
 //
 //-------------------------------------------------------------------------------------------------
+
+i64_t exMemory::GetAddress(const unsigned int& offset, const std::string& modName)
+{
+	if (!IsValidInstance())
+		return 0;
+
+	if (modName.empty())
+		return vmProcess.dwModuleBase + offset;
+
+	i64_t result = 0;
+	if (GetModuleAddressEx(vmProcess.hProc, modName, &result))
+		return result;
+
+	return 0;
+}
 
 bool exMemory::ReadMemory(const i64_t& addr, void* buffer, const DWORD& szRead)
 {

@@ -69,10 +69,10 @@ class exMemory
 			CONSTRUCTORS 
 	*/
 public:	
-	explicit exMemory();	//	 default constructor | does nothing
+	explicit exMemory() = default;	//	 default constructor | does nothing
 	explicit exMemory(const std::string& name);	//	attaches to process with all access rights
-	explicit exMemory(const std::string& name, const DWORD& dwAccess);
-	~exMemory() noexcept;
+	explicit exMemory(const std::string& name, const DWORD& dwAccess);	//	attaches to process with specified access rights
+	~exMemory() noexcept;	//	destructor | detaches from process if attached
 
 	/*//--------------------------\\
 			INSTANCE MEMBERS
@@ -104,6 +104,8 @@ public:	//
 
 
 public:
+	/* gets an address relative to the input named module base address */
+	i64_t GetAddress(const unsigned int& offset, const std::string& modName = "");
 
 	/* reads a memory into a buffer at the specified address in the attached process
 	* returns true if all bytes were read
