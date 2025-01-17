@@ -1,13 +1,12 @@
 # exMemory
-`exMemory` is a C++ utility class designed for advanced memory manipulation tasks on external processes. It supports reading, writing, and patching memory, as well as managing process and module information. The class offers both static and instance-based operations for maximum flexibility.
+`exMemory` is a C++ utility class designed for advanced memory manipulation tasks on external processes. It supports reading, writing, and scanning process memory, as well as managing process and module information. The class offers both static and instance-based operations for maximum flexibility.
 
 ## Features
-- Attach and detach from processes.
-- Read and write memory (including pointer chains and strings).
-- Patch memory with custom byte sequences.
-- Find and manipulate modules and sections in a process.
+- Attach and detach from various processes.
+- Read and write to process memory (including pointer chains , strings & patterns).
+- Patch memory with custom bytes
+- enumerate modules and sections in a process.
 - Pattern scanning with optional instruction-based offsets.
-- Retrieve process and module information.
 - Static methods for direct operations without maintaining an instance.
 
 ---
@@ -24,7 +23,7 @@
 
 1. Clone the repository:
 ```bash
-   git clone https://github.com/yourusername/exMemory.git
+git clone https://github.com/yourusername/exMemory.git
 ```
 2. Include the exMemory.h file in your project:
 ```cpp
@@ -43,9 +42,10 @@ int main()
 {
     exMemory mem = exMemory("pcsx2-qt.exe", PROCESS_ALL_ACCESS);    //  attaches to the named process if found
     const auto& pInfo = mem.GetProcessInfo();   //  basic process information is obtained during the attach procedure
-    
-    int value = memory.Read<int>(pInfo.dwModuleBase + 0x12345678);  //  read 4 bytes from the target process at the input address
-    
+    if (pInfo.bAttached)    //  check if actually attached to the process
+    {
+        const auto& value = mem.Read<IMAGE_DOS_HEADER>(pInfo.dwModuleBase);  //  read the dos header section
+    }
     memory.Detach();    //  detach and free any resources
     
     return 0;
@@ -59,9 +59,9 @@ int main()
 int main() 
 {
     procInfo_t proc;
-    if (exMemory::AttachEx("pcsx2-qt.exe", &proc, PROCESS_ALL_ACCESS))
+    if (exMemory::AttachEx("pcsx2-qt.exe", &proc, PROCESS_ALL_ACCESS))  //  attach to named process with desired access
     {
-        int value = exMemory::ReadEx<int>(pInfo.hProc, pInfo.dwModuleBase + 0x12345678); 
+        const auto& value = exMemory::ReadEx<IMAGE_DOS_HEADER>(pInfo.hProc, pInfo.dwModuleBase);    //  read the dos header section
         
         exMemory::DetachEx(proc);
     }
@@ -75,21 +75,34 @@ int main()
 **Instance Methods**
 - Attach/Detach
 ```cpp
-bool Attach(const std::string& name, const DWORD& dwAccess = PROCESS_ALL_ACCESS);
-bool Detach();
+
+//  Constructor
+exMemory mem = exMemory("pcsx2-qt.exe");    //  attaches to pcsx2 process with default PROCESS_ALL_ACCESS rights , process information is accessible via 'mem.GetProcessInfo()'
+
+//  custom , can also be used to overwrite existing attached process
+bool Attach(const std::string& name, const DWORD& dwAccess = PROCESS_ALL_ACCESS);   //  attaches to named process with desired access
+bool Detach();  //  detaches from the attached process
 ```
 
 - Read/Write Memory
 ```cpp
+// 
+bool ReadMemory(const i64_t& addr, void* buffer, const DWORD& szRead);
+bool ReadString(const i64_t& addr, std::string& string, const DWORD& szString = MAX_PATH);
+bool WriteMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite);
+bool PatchMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite);
+
+//  template
 template<typename T>
-T Read(i64_t addr);
+T Read(const i64_t& addr);
 
 template<typename T>
-bool Write(i64_t addr, T value);
+bool Write(const i64_t& addr, T value);
 ```
 
-- Pattern Scanning
+- Pointer Chains & Pattern Scanning
 ```cpp
+i64_t ReadPointerChain(const i64_t& addr, std::vector<unsigned int>& offsets, i64_t* lpResult);
 i64_t FindPattern(const std::string& signature, i64_t* result, int padding = 0, bool isRelative = false, EASM instruction = EASM::ASM_NULL);
 ```
 
@@ -102,17 +115,28 @@ static bool DetachEx(procInfo_t& pInfo);
 
 - Direct Memory Operations
 ```cpp
+//  methods
 static bool ReadMemoryEx(const HANDLE& hProc, const i64_t& addr, void* buffer, size_t szRead);
+static bool ReadStringEx(const HANDLE& hProc, const i64_t& addr, const size_t& szString, std::string* lpResult);
 static bool WriteMemoryEx(const HANDLE& hProc, const i64_t& addr, LPVOID buffer, DWORD szWrite);
 static bool PatchMemoryEx(const HANDLE& hProc, const i64_t& addr, const void* buffer, const DWORD& szWrite);
+
+//  templates
+template<typename T>
+T ReadEx(const HANDLE& hProc, const i64_t& addr);
+
+template<typename T>
+bool WriteEx(const HANDLE& hProc, const i64_t& addr, T value);
 ```
 
-### Advanced Features
-**Pattern Scanning**
-Find memory patterns with custom instructions and offsets:
+- Pointer Chains & Pattern Scanning
 ```cpp
-i64_t address = memory.FindPattern("90 90 ?? ?? E8 ?? ?? ?? ??", nullptr, 0, true, EASM::ASM_CALL);
+static bool ReadPointerChainEx(const HANDLE& hProc, const i64_t& addr, const std::vector<unsigned int>& offsets, i64_t* lpResult);
+static bool FindPatternEx(const HANDLE& hProc, const std::string& moduleName, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction);
+static bool FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction);
 ```
+
+## Advanced Features
 
 **Pointer Chains**
 Resolve multi-level pointer chains:
@@ -130,8 +154,14 @@ if (exMemory::AttachEx("pcsx2-qt.exe", &proc, PROCESS_ALL_ACCESS))
 }
 ```
 
+**Pattern Scanning**
+Find memory patterns with custom instructions and offsets:
+```cpp
+i64_t address = memory.FindPattern("90 90 ?? ?? E8 ?? ?? ?? ??", nullptr, 0, false);
+```
+
 **Section Walking**
-Get the base address of a section in a processes module
+Get the base address of a section in a processes module:
 ```cpp
 //	get process information for pcsx2-qt.exe
 //  remember that Reading & writing process memory requires a handle to the process 
@@ -148,7 +178,7 @@ if (exMemory::AttachEx("pcsx2-qt.exe", &proc, PROCESS_ALL_ACCESS))
 ```
 
 **Resolve Export Table Entries**
-Retrieve the address of an exported function
+Retrieve the address of an exported function:
 ```cpp
 //	get process information for pcsx2-qt.exe
 //  remember that Reading & writing process memory requires a handle to the process 
@@ -161,17 +191,17 @@ if (exMemory::AttachEx("pcsx2-qt.exe", &proc, PROCESS_ALL_ACCESS))
 }
 ```
 
-### Enums and Structures
+## Enums and Structures
 **Enums**
 - EASM: Assembly instruction types (e.g., ASM_MOV, ASM_CALL).
 - ESECTIONHEADERS: Section headers in a PE file (e.g., .text, .data).
 - EINJECTION: Injection types (e.g., LOADLIBRARY, MANUAL).
 
-### Structures
+**Structures**
 - procInfo_t: Represents process information (ID, handle, base address, etc.).
 - modInfo_t: Represents module information (base address, name, etc.).
 
-**Performance Considerations**
+## Performance Considerations
 - Instance methods are optimized for scenarios where a process is frequently accessed.
 - Static methods are ideal for one-off operations without maintaining a persistent state.
 - Avoid repeated calls to slow methods like GetActiveProcessesEx unless caching results.
@@ -180,8 +210,8 @@ if (exMemory::AttachEx("pcsx2-qt.exe", &proc, PROCESS_ALL_ACCESS))
 Contributions are welcome! Please submit a pull request or open an issue for bug reports and feature suggestions.
 
 ## License
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is not currently licensed.
 
 ## Acknowledgments
-- Windows API documentation
-- various community resources
+- Windows API documentation ( links included in various parts of the source, however I intend to include a section for resources in the future )
+- various community resources ( links coming soon )
