@@ -188,18 +188,26 @@ public:	//	methods for directly attaching to a process
 	static bool DetachEx(procInfo_t& pInfo);
 
 
-public:	//	methods for retrieving information on a process by name
+public:	//	methods for retrieving information on a process by name , are somewhat slow and should not be used constantly. consider caching information if needed.
 
-	/* attempts to retrieve a process id by name */
+	/* attempts to retrieve a process id by name 
+	* utilizes FindProcessEx which iterates through ALL processes information before again searching through the procInfo list to return a match ( if any )
+	*/
 	static bool GetProcID(const std::string& procName, DWORD* outPID);
 
-	/* attempts to obtain the module base address for the specified process name */
+	/* attempts to obtain the module base address for the specified process name 
+	* utilizes FindProcessEx which iterates through ALL processes information before again searching through the procInfo list to return a match ( if any )
+	*/
 	static bool GetModuleBaseAddress(const std::string& procName, i64_t* lpResult, const std::string& modName = "");
 
-	/* attempts to obtain information on a process & open a handle to it */
+	/* attempts to obtain information on a process & open a handle to it 
+	* utilizes FindProcessEx which iterates through ALL processes information before again searching through the procInfo list to return a match ( if any )
+	*/
 	static bool GetProcInfo(const std::string& name, procInfo_t* lpout);
 
-	/* determines if the specified name exists in the active process directory */
+	/* determines if the specified name exists in the active process directory 
+	* utilizes FindProcessEx which iterates through ALL processes information before again searching through the procInfo list to return a match ( if any )
+	*/
 	static bool IsProcessRunning(const std::string& name);
 
 
@@ -211,7 +219,9 @@ public:	//	methods for obtaining info on active processes
 	/* obtains a list of all modules loaded in the attached process */
 	static bool GetProcessModulesEx(const DWORD& dwPID, std::vector< modInfo_t>& moduleList);
 
-	/* gets info on a process by name , can be extended to attach to the process if found */
+	/* gets info on a process by name , can be extended to attach to the process if found 
+	* utilizes GetActiveProcesses method which is somewhat slow as it obtains ALL processes before returning
+	*/
 	static bool FindProcessEx(const std::string& procName, procInfo_t* procInfo, const bool& bAttach, const DWORD& dwDesiredAccess);
 
 	/* attempts to find a module by name located in the attached process and returns it's base address */
@@ -231,7 +241,7 @@ public:	//	basic memory operations
 	/* attempts to return an address located in memory via chain of offsets */
 	static bool ReadPointerChainEx(const HANDLE& hProc, const i64_t& addr, const std::vector<unsigned int>& offsets, i64_t* lpResult);
 
-	/*  */
+	/* attempts to patch a sequence of bytes in the target process */
 	static bool PatchMemoryEx(const HANDLE& hProc, const i64_t& addr, const void* buffer, const DWORD& szWrite);
 
 public:	//	advanced methods for obtaining information on a process which requires a handle
@@ -255,7 +265,7 @@ public:	//	advanced methods for obtaining information on a process which require
 public:	//	injection operations 
 
 	/* injects a module (from disk) into the target process using LoadLibrary */
-	static bool LoadLibraryInjectorEx(const HANDLE& hProc, const std::string& path);
+	static bool LoadLibraryInjectorEx(const HANDLE& hProc, const std::string& dllPath);
 
 
 public:	//	template methods

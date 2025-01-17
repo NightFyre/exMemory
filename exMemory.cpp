@@ -453,68 +453,6 @@ bool exMemory::GetModuleAddressEx(const HANDLE& hProc, const std::string& module
 	return false;
 }
 
-bool exMemory::GetProcAddressEx(const HANDLE& hProc, const std::string& moduleName, const std::string& fnName, i64_t* lpResult)
-{
-	i64_t dwModuleBase = 0;
-	if (!GetModuleAddressEx(hProc, moduleName, &dwModuleBase) || !dwModuleBase)
-		return false;
-
-	return GetProcAddressEx(hProc, dwModuleBase, fnName, lpResult);
-}
-
-bool exMemory::GetProcAddressEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& fnName, i64_t* lpResult)
-{
-	const auto& fnNameLower = StringHelper::ToLower(fnName);
-
-	//	get image doe header
-	const auto& image_dos_header = ReadEx<IMAGE_DOS_HEADER>(hProc, dwModule);
-	if (image_dos_header.e_magic != IMAGE_DOS_SIGNATURE)
-		return false;
-
-	//	get nt headers
-	const auto& image_nt_headers = ReadEx<IMAGE_NT_HEADERS>(hProc, dwModule + image_dos_header.e_lfanew);
-	if (image_nt_headers.Signature != IMAGE_NT_SIGNATURE
-		|| image_nt_headers.OptionalHeader.NumberOfRvaAndSizes <= 0)
-		return false;
-
-	//	get export directory
-	const auto& export_directory_va = image_nt_headers.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress + dwModule;
-	const auto& export_directory = ReadEx<IMAGE_EXPORT_DIRECTORY>(hProc, export_directory_va);
-	if (!export_directory.AddressOfNames || !export_directory.AddressOfFunctions || !export_directory.AddressOfNameOrdinals)
-		return false;
-
-	//	get address of *
-	const auto& names_va = dwModule + export_directory.AddressOfNames;
-	const auto& functions_va = dwModule + export_directory.AddressOfFunctions;
-	const auto& ordinals_va = dwModule + export_directory.AddressOfNameOrdinals;
-	for (int i = 0; i < export_directory.NumberOfNames; i++)
-	{
-		//	get address of name
-		const auto& name_rva = ReadEx<DWORD>(hProc, names_va + (i * 0x4));
-		const auto& name_va = name_rva + dwModule;
-
-		//	read & compare name with input string
-		std::string cmp;
-		if (!ReadStringEx(hProc, name_va, MAX_PATH, &cmp))
-			continue;
-
-		//	compare strings
-		if (fnNameLower != StringHelper::ToLower(cmp))
-			continue;
-
-		//	get function address
-		const auto& name_ordinal = ReadEx<short>(hProc, ordinals_va + (i * 0x2));				//	get ordinal at the current index
-		const auto& function_rva = ReadEx<DWORD>(hProc, functions_va + (name_ordinal * 0x4));	//	get function va from the ordinal index of the functions array
-
-		//	pass result
-		*lpResult = i64_t(function_rva + dwModule);
-
-		return true;
-	}
-
-	return false;
-}
-
 bool exMemory::GetSectionHeaderAddressEx(const HANDLE& hProc, const std::string& moduleName, const ESECTIONHEADERS& section, i64_t* lpResult, size_t* szImage)
 {
 	i64_t dwModuleBase = 0;
@@ -670,6 +608,100 @@ bool exMemory::FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const s
 	}
 
 	return result;
+}
+
+bool exMemory::GetProcAddressEx(const HANDLE& hProc, const std::string& moduleName, const std::string& fnName, i64_t* lpResult)
+{
+	i64_t dwModuleBase = 0;
+	if (!GetModuleAddressEx(hProc, moduleName, &dwModuleBase) || !dwModuleBase)
+		return false;
+
+	return GetProcAddressEx(hProc, dwModuleBase, fnName, lpResult);
+}
+
+bool exMemory::GetProcAddressEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& fnName, i64_t* lpResult)
+{
+	const auto& fnNameLower = StringHelper::ToLower(fnName);
+
+	//	get image doe header
+	const auto& image_dos_header = ReadEx<IMAGE_DOS_HEADER>(hProc, dwModule);
+	if (image_dos_header.e_magic != IMAGE_DOS_SIGNATURE)
+		return false;
+
+	//	get nt headers
+	const auto& image_nt_headers = ReadEx<IMAGE_NT_HEADERS>(hProc, dwModule + image_dos_header.e_lfanew);
+	if (image_nt_headers.Signature != IMAGE_NT_SIGNATURE
+		|| image_nt_headers.OptionalHeader.NumberOfRvaAndSizes <= 0)
+		return false;
+
+	//	get export directory
+	const auto& export_directory_va = image_nt_headers.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress + dwModule;
+	const auto& export_directory = ReadEx<IMAGE_EXPORT_DIRECTORY>(hProc, export_directory_va);
+	if (!export_directory.AddressOfNames || !export_directory.AddressOfFunctions || !export_directory.AddressOfNameOrdinals)
+		return false;
+
+	//	get address of *
+	const auto& names_va = dwModule + export_directory.AddressOfNames;
+	const auto& functions_va = dwModule + export_directory.AddressOfFunctions;
+	const auto& ordinals_va = dwModule + export_directory.AddressOfNameOrdinals;
+	for (int i = 0; i < export_directory.NumberOfNames; i++)
+	{
+		//	get address of name
+		const auto& name_rva = ReadEx<DWORD>(hProc, names_va + (i * 0x4));
+		const auto& name_va = name_rva + dwModule;
+
+		//	read & compare name with input string
+		std::string cmp;
+		if (!ReadStringEx(hProc, name_va, MAX_PATH, &cmp))
+			continue;
+
+		//	compare strings
+		if (fnNameLower != StringHelper::ToLower(cmp))
+			continue;
+
+		//	get function address
+		const auto& name_ordinal = ReadEx<short>(hProc, ordinals_va + (i * 0x2));				//	get ordinal at the current index
+		const auto& function_rva = ReadEx<DWORD>(hProc, functions_va + (name_ordinal * 0x4));	//	get function va from the ordinal index of the functions array
+
+		//	pass result
+		*lpResult = i64_t(function_rva + dwModule);
+
+		return true;
+	}
+
+	return false;
+}
+
+//-------------------------------------------------------------------------------------------------
+//
+//
+//-------------------------------------------------------------------------------------------------
+
+bool exMemory::LoadLibraryInjectorEx(const HANDLE& hProc, const std::string& dllPath)
+{
+	//  allocate memory
+	void* addr = VirtualAllocEx(hProc, 0, MAX_PATH, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	if (!addr)
+		return false;
+
+	//  write to memory
+	if (!WriteProcessMemory(hProc, addr, dllPath.c_str(), dllPath.size() + 1, 0))
+	{
+		VirtualFreeEx(hProc, addr, 0, MEM_RELEASE);
+		return false;
+	}
+
+	//  create thread
+	HANDLE hThread = CreateRemoteThread(hProc, 0, 0, (LPTHREAD_START_ROUTINE)LoadLibraryA, addr, 0, 0);
+	if (!hThread)
+	{
+		VirtualFreeEx(hProc, addr, 0, MEM_RELEASE);
+		return false;
+	}
+
+	//  close handle and return result
+	CloseHandle(hThread);
+	return true;
 }
 
 //-------------------------------------------------------------------------------------------------
