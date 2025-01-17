@@ -1,7 +1,19 @@
 # ignore ide settings
 *.vs
 
+# ignore
+*.exe
+*.dll
+*.bin
+
 # ignore user settings
-*.sln
 *.vcxproj.user
 *.vcxproj.filters
+*.code-workspace
+
+# ignore build paths
+bin/
+debug/
+release/
+x86/
+x64/
