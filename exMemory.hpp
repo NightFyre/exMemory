@@ -215,7 +215,7 @@ public:	//	methods for retrieving information on a process by name , are somewha
 	*/
 	static bool GetModuleBaseAddress(const std::string& procName, i64_t* lpResult, const std::string& modName = "");
 
-	/* attempts to obtain information on a process & open a handle to it
+	/* attempts to obtain information on a process without opening a handle to it
 	* utilizes FindProcessEx which iterates through ALL processes information before again searching through the procInfo list to return a match ( if any )
 	*/
 	static bool GetProcInfo(const std::string& name, procInfo_t* lpout);
@@ -228,7 +228,9 @@ public:	//	methods for retrieving information on a process by name , are somewha
 
 public:	//	methods for obtaining info on active processes
 
-	/* obtains a list of all active processes on the machine that contains basic information on a process without requiring a handle */
+	/* obtains a list of all active processes on the machine that contains basic information on a process without requiring a handle 
+	* ref: https://learn.microsoft.com/en-us/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes
+	*/
 	static bool GetActiveProcessesEx(std::vector<procInfo_t>& procList);
 
 	/* obtains a list of all modules loaded in the attached process */
@@ -264,15 +266,24 @@ public:	//	advanced methods for obtaining information on a process which require
 	/* attempts to find a module by name located in the attached process and returns it's base address */
 	static bool GetModuleAddressEx(const HANDLE& hProc, const std::string& moduleName, i64_t* lpResult);
 
-	/* attempts to return the address of a section header by index */
+	/* attempts to return the address of a section header by index 
+	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_nt_headers64
+	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_file_header
+	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_optional_header64
+	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_section_header
+	*/
 	static bool GetSectionHeaderAddressEx(const HANDLE& hProc, const std::string& moduleName, const ESECTIONHEADERS& section, i64_t* lpResult, size_t* szImage);
 	static bool GetSectionHeaderAddressEx(const HANDLE& hProc, const i64_t& dwModule, const ESECTIONHEADERS& section, i64_t* lpResult, size_t* szImage);
 
-	/* attempts to return an address located in memory via pattern scan. can be extended to extract bytes from an instruction */
+	/* attempts to return an address located in memory via pattern scan. can be extended to extract bytes from an instruction 
+	* modifed version of -> https://www.unknowncheats.me/forum/3019469-post2.html 
+	*/
 	static bool FindPatternEx(const HANDLE& hProc, const std::string& moduleName, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction);
 	static bool FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction);
 
-	/* attempts to find an exported function by name and return the it's rva */
+	/* attempts to find an exported function by name and return the it's rva 
+	* https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_data_directory
+	*/
 	static bool GetProcAddressEx(const HANDLE& hProc, const std::string& moduleName, const std::string& fnName, i64_t* lpResult);
 	static bool GetProcAddressEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& fnName, i64_t* lpResult);
 
@@ -323,7 +334,9 @@ private://	tools
 		HWND hwnd;
 	};
 
-	/* callback for EnumWindows to find the maine process window */
+	/* callback for EnumWindows to find the maine process window 
+	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumwindows
+	*/
 	static BOOL CALLBACK GetProcWindowEx(HWND handle, LPARAM lParam);
 };
 
@@ -899,12 +912,12 @@ bool exMemory::GetSectionHeaderAddressEx(const HANDLE& hProc, const i64_t& dwMod
 	std::string segment;
 	switch (section)
 	{
-	case ESECTIONHEADERS::SECTION_TEXT: { segment = ".text"; break; }
-	case ESECTIONHEADERS::SECTION_DATA: { segment = ".data"; break; }
-	case ESECTIONHEADERS::SECTION_RDATA: { segment = ".rdata"; break; }
-	case ESECTIONHEADERS::SECTION_IMPORT: { segment = ".idata"; break; }
-	case ESECTIONHEADERS::SECTION_EXPORT: { segment = ".edata"; break; }
-	default: return false;
+		case ESECTIONHEADERS::SECTION_TEXT: { segment = ".text"; break; }
+		case ESECTIONHEADERS::SECTION_DATA: { segment = ".data"; break; }
+		case ESECTIONHEADERS::SECTION_RDATA: { segment = ".rdata"; break; }
+		case ESECTIONHEADERS::SECTION_IMPORT: { segment = ".idata"; break; }
+		case ESECTIONHEADERS::SECTION_EXPORT: { segment = ".edata"; break; }
+		default: return false;
 	}
 	if (segment.empty())	//	segment title not captured ?? 
 		return false;
@@ -915,21 +928,16 @@ bool exMemory::GetSectionHeaderAddressEx(const HANDLE& hProc, const i64_t& dwMod
 		return false;
 
 	//	get nt headers
-	/*https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_nt_headers64*/
 	const auto& e_lfanew = dwModule + image_dos_header.e_lfanew;
 	const auto& image_nt_headers = ReadEx<IMAGE_NT_HEADERS>(hProc, e_lfanew);
 	if (image_nt_headers.Signature != IMAGE_NT_SIGNATURE)
 		return false;
 
 	//	Get section
-	/*https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_section_header*/
 	size_t section_size = 0;
 	i64_t section_base = 0;
 	const auto& image_section_header = e_lfanew + sizeof(IMAGE_NT_HEADERS);
 	IMAGE_SECTION_HEADER section_headers_base = ReadEx<IMAGE_SECTION_HEADER>(hProc, image_section_header);
-
-	/*https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_file_header*/
-	/*https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_optional_header64*/
 	for (int i = 0; i < image_nt_headers.FileHeader.NumberOfSections; ++i)
 	{
 		if (strncmp(reinterpret_cast<const char*>(section_headers_base.Name), segment.c_str(), segment.size()) != 0)
@@ -1143,7 +1151,6 @@ bool exMemory::LoadLibraryInjectorEx(const HANDLE& hProc, const std::string& dll
 //
 //-------------------------------------------------------------------------------------------------
 
-/*https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumwindows*/
 BOOL CALLBACK exMemory::GetProcWindowEx(HWND window, LPARAM lParam)
 {
 	auto data = reinterpret_cast<EnumWindowData*>(lParam);
