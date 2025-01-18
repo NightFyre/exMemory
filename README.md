@@ -218,3 +218,7 @@ if (exMemory::AttachEx("pcsx2-qt.exe", &proc, PROCESS_ALL_ACCESS))
 ## Resources
 - [GuidedHacking](https://guidedhacking.com)
 - [UnknownCheats](https://unknowncheats.me/)
+- [WinApi Process Enumeration](https://learn.microsoft.com/en-us/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes)
+- [WinApi About Memory Management](https://learn.microsoft.com/en-us/windows/win32/memory/about-memory-management)
+- [WinApi Virtual Memory Functions](https://learn.microsoft.com/en-us/windows/win32/Memory/virtual-memory-functions)
+- [WinApi Memory Management Reference](https://learn.microsoft.com/en-us/windows/win32/memory/memory-management-reference)
