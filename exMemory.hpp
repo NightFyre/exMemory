@@ -4,8 +4,7 @@
 #include <Psapi.h>
 #include <memory>
 #include <vector>
-
-#include <StringHelper.h>	
+#include <string>
 
 //	architechture type helpers
 #ifdef _WIN64
@@ -14,7 +13,11 @@ typedef unsigned __int64  i64_t;
 typedef unsigned int i64_t;
 #endif
 
-struct MODULEINFO64;
+//	HELPERS
+std::string ToLower(const std::string& input);
+std::string ToUpper(const std::string& input);
+std::string ToString(const std::wstring& input);
+std::wstring ToWString(const std::string& input);
 
 //	general process information
 struct PROCESSINFO64
@@ -685,8 +688,8 @@ bool exMemory::GetActiveProcessesEx(std::vector<procInfo_t>& list)
 
 			//	module found
 			procInfo_t proc;
-			proc.mProcName = StringHelper::ToString(procEntry.szExeFile);      //  process name
-			proc.mProcPath = StringHelper::ToString(modEntry.szExePath);       //  process path
+			proc.mProcName = ToString(procEntry.szExeFile);      //  process name
+			proc.mProcPath = ToString(modEntry.szExePath);       //  process path
 			proc.dwPID = procID;											   //  process ID
 			proc.dwModuleBase = i64_t(modEntry.modBaseAddr);                   //  module base address
 
@@ -731,7 +734,7 @@ bool exMemory::GetProcessModulesEx(const DWORD& dwPID, std::vector<modInfo_t>& l
 		modInfo_t mod;
 		mod.dwPID = dwPID;												   //  process ID
 		mod.dwModuleBase = i64_t(modEntry.modBaseAddr);					   //  module base address
-		mod.mModName = StringHelper::ToString(modEntry.szModule);		   //  module name
+		mod.mModName = ToString(modEntry.szModule);		   //  module name
 
 		//  push back module to list
 		active_module_list.push_back(mod);
@@ -795,8 +798,8 @@ bool exMemory::FindProcessEx(const std::string& procName, procInfo_t* procInfo, 
 
 bool exMemory::FindModuleEx(const std::string& procName, const std::string& modName, modInfo_t* lpResult)
 {
-	const auto& proc_cmp = StringHelper::ToLower(procName);
-	const auto& mod_cmp = StringHelper::ToLower(modName);
+	const auto& proc_cmp = ToLower(procName);
+	const auto& mod_cmp = ToLower(modName);
 	bool bFound{ false };
 	modInfo_t modInfo;
 
@@ -817,7 +820,7 @@ bool exMemory::FindModuleEx(const std::string& procName, const std::string& modN
 	do
 	{
 		//	compare process names
-		if (StringHelper::ToLower(StringHelper::ToString(procEntry.szExeFile)) != proc_cmp)
+		if (ToLower(ToString(procEntry.szExeFile)) != proc_cmp)
 			continue;
 
 		//	snapshot modules
@@ -837,7 +840,7 @@ bool exMemory::FindModuleEx(const std::string& procName, const std::string& modN
 		do
 		{
 			//	compare module names
-			if (StringHelper::ToLower(StringHelper::ToString(modEntry.szModule)) != mod_cmp)
+			if (ToLower(ToString(modEntry.szModule)) != mod_cmp)
 				continue;
 
 			//	module found
@@ -846,7 +849,7 @@ bool exMemory::FindModuleEx(const std::string& procName, const std::string& modN
 			//	get module properties
 			modInfo.dwModuleBase = i64_t(modEntry.modBaseAddr);                   //  module base address
 			modInfo.dwPID = procEntry.th32ProcessID;                              //  process ID
-			modInfo.mModName = StringHelper::ToString(modEntry.szModule);		//  module name
+			modInfo.mModName = ToString(modEntry.szModule);		//  module name
 
 			//	pass ref
 			*lpResult = modInfo;
@@ -886,7 +889,7 @@ bool exMemory::GetModuleAddressEx(const HANDLE& hProc, const std::string& module
 		if (!GetModuleBaseName(hProc, modules[i], modName, sizeof(modName) / sizeof(wchar_t)))
 			continue;
 
-		if (StringHelper::ToLower(StringHelper::ToString(modName)) != moduleName)
+		if (ToLower(ToString(modName)) != moduleName)
 			continue;
 
 		*lpResult = reinterpret_cast<i64_t>(modules[i]);
@@ -1060,7 +1063,7 @@ bool exMemory::GetProcAddressEx(const HANDLE& hProc, const std::string& moduleNa
 
 bool exMemory::GetProcAddressEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& fnName, i64_t* lpResult)
 {
-	const auto& fnNameLower = StringHelper::ToLower(fnName);
+	const auto& fnNameLower = ToLower(fnName);
 
 	//	get image doe header
 	const auto& image_dos_header = ReadEx<IMAGE_DOS_HEADER>(hProc, dwModule);
@@ -1095,7 +1098,7 @@ bool exMemory::GetProcAddressEx(const HANDLE& hProc, const i64_t& dwModule, cons
 			continue;
 
 		//	compare strings
-		if (fnNameLower != StringHelper::ToLower(cmp))
+		if (fnNameLower != ToLower(cmp))
 			continue;
 
 		//	get function address
@@ -1166,3 +1169,34 @@ BOOL CALLBACK exMemory::GetProcWindowEx(HWND window, LPARAM lParam)
 
 	return true;
 }
+
+
+//-------------------------------------------------------------------------------------------------
+//
+// 									HELPER METHODS
+//
+//-------------------------------------------------------------------------------------------------
+
+//---------------------------------------------------------------------------------------------------
+std::string ToLower(const std::string& input)
+{
+	std::string result;
+	for (auto c : input)
+		result += tolower(c);
+	return result;
+};
+
+//---------------------------------------------------------------------------------------------------
+std::string ToUpper(const std::string& input)
+{
+	std::string result;
+	for (auto c : input)
+		result += toupper(c);
+	return result;
+};
+
+//---------------------------------------------------------------------------------------------------
+std::string ToString(const std::wstring& input) { return std::string(input.begin(), input.end()); }
+
+//---------------------------------------------------------------------------------------------------
+std::wstring ToWString(const std::string& input) { return std::wstring(input.begin(), input.end()); }
