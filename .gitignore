@@ -1,19 +1,9 @@
-# ignore ide settings
-*.vs
+# ignore everything
+*
 
-# ignore
-*.exe
-*.dll
-*.bin
+# unignore .gitignore
+!.gitignore
 
-# ignore user settings
-*.vcxproj.user
-*.vcxproj.filters
-*.code-workspace
-
-# ignore build paths
-bin/
-debug/
-release/
-x86/
-x64/
+# unignore source file
+!exMemory.hpp
+!README.md

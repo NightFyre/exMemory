@@ -6,21 +6,21 @@
 #include <vector>
 #include <string>
 
-//	architechture type helpers
+//	architecture type helpers
 #ifdef _WIN64
 typedef unsigned __int64  i64_t;
 #else
 typedef unsigned int i64_t;
 #endif
 
-//	HELPERS
+//	fwd declare helpers
 std::string ToLower(const std::string& input);
 std::string ToUpper(const std::string& input);
 std::string ToString(const std::wstring& input);
 std::wstring ToWString(const std::string& input);
 
 //	general process information
-struct PROCESSINFO64
+typedef struct PROCESSINFO64
 {
 	bool							bAttached;								//	set when attached to a process
 	DWORD							dwAccessLevel{ 0 };						//	access rights to process ( if attached )
@@ -31,14 +31,15 @@ struct PROCESSINFO64
 	std::string						mProcName{ "" };						//	process name
 	std::string						mProcPath{ "" };						//	process path
 	std::string						mWndwTitle{ "" };						//	process window title
-}; typedef PROCESSINFO64 procInfo_t;
+} PROCESSINFO32 , procInfo_t;
 
-struct MODULEINFO64
+//	general module information
+typedef struct MODULEINFO64
 {
 	DWORD							dwPID{ 0 };							//	owning process id
 	i64_t							dwModuleBase{ 0 };					//	module base address in process
 	std::string						mModName{ "" };						//	module name
-}; typedef MODULEINFO64 modInfo_t;
+} MODULEINFO32 , modInfo_t;
 
 //	assembly opcode index
 enum class EASM : int
@@ -69,6 +70,10 @@ enum class EINJECTION : int
 	INJECT_NULL
 };
 
+/*
+* 
+* 
+*/
 class exMemory
 {
 	/*//--------------------------\\
@@ -85,16 +90,17 @@ public:
 	*/
 public:
 	bool						bAttached;	//	attached to a process
+	double						mFrequency;	//	update frequency in ms
 
 private:
 	procInfo_t					vmProcess;	//	attached process information
 	std::vector<procInfo_t>		vmProcList;	//	active process list
-	std::vector<procInfo_t>		vmModList;	//	module list for attached process
+	std::vector<modInfo_t>		vmModList;	//	module list for attached process
 
 	/*//--------------------------\\
 			INSTANCE METHODS
 	*/
-public:	//	
+public:
 
 	/* attempts to attach to a process by name */
 	virtual bool Attach(const std::string& name, const DWORD& dwAccess = PROCESS_ALL_ACCESS);
@@ -105,8 +111,22 @@ public:	//
 	/* verifies attached process is active & updates processinfo structure when needed */
 	virtual void update();
 
-	/* returns the process information structure */
+	/* returns the process information structure 
+	* see: procInfo_t or PROCESSINFO64
+	*/
 	const procInfo_t& GetProcessInfo() const { return vmProcess; }
+
+	/* returns an updated process list */
+	const std::vector<procInfo_t>& GetProcessList() const { return vmProcList; }
+	
+	/* returns a list containing all modules in the attached process */
+	const std::vector<modInfo_t>& GetModuleList() const { return vmModList; }
+
+
+private:
+
+	/* helper method to determine if the current memory instance is attached to a process for handling various memory operations */
+	const bool IsValidInstance() noexcept { return !bAttached || !vmProcess.bAttached || vmProcess.hProc == INVALID_HANDLE_VALUE; }
 
 
 public:
@@ -185,12 +205,6 @@ public:
 	/* template write memory */
 	template<typename T>
 	auto Write(i64_t addr, T patch) noexcept -> bool { return WriteMemory(addr, &patch, sizeof(T)); }
-
-
-private:
-
-	/* helper method to determine if the current memory instance is attached to a process for handling various memory operations */
-	const bool IsValidInstance() noexcept { return !bAttached || !vmProcess.bAttached || vmProcess.hProc == INVALID_HANDLE_VALUE; }
 
 
 	/*//--------------------------\\
@@ -342,7 +356,6 @@ private://	tools
 	*/
 	static BOOL CALLBACK GetProcWindowEx(HWND handle, LPARAM lParam);
 };
-
 
 
 //-------------------------------------------------------------------------------------------------
@@ -509,6 +522,7 @@ bool exMemory::LoadLibraryInject(const std::string& dllPath)
 	return LoadLibraryInjectorEx(vmProcess.hProc, dllPath);
 }
 
+
 //-------------------------------------------------------------------------------------------------
 //
 // 									STATIC METHODS
@@ -531,6 +545,7 @@ bool exMemory::DetachEx(procInfo_t& pInfo)
 
 	return result;
 }
+
 
 //-------------------------------------------------------------------------------------------------
 //
@@ -580,6 +595,7 @@ bool exMemory::IsProcessRunning(const std::string& name)
 {
 	return FindProcessEx(name, nullptr, false, NULL);
 }
+
 
 //-------------------------------------------------------------------------------------------------
 //
@@ -636,6 +652,7 @@ bool exMemory::PatchMemoryEx(const HANDLE& hProc, const i64_t& addr, const void*
 	VirtualProtectEx(hProc, LPVOID(addr), szWrite, oldprotect, &oldprotect);					//	restore memory protection
 	return result;
 }
+
 
 //-------------------------------------------------------------------------------------------------
 //
@@ -868,6 +885,7 @@ bool exMemory::FindModuleEx(const std::string& procName, const std::string& modN
 
 	return bFound;
 }
+
 
 //-------------------------------------------------------------------------------------------------
 //
@@ -1114,6 +1132,7 @@ bool exMemory::GetProcAddressEx(const HANDLE& hProc, const i64_t& dwModule, cons
 	return false;
 }
 
+
 //-------------------------------------------------------------------------------------------------
 //
 // 									STATIC METHODS ( INJECTION OPERATIONS )
@@ -1177,7 +1196,6 @@ BOOL CALLBACK exMemory::GetProcWindowEx(HWND window, LPARAM lParam)
 //
 //-------------------------------------------------------------------------------------------------
 
-//---------------------------------------------------------------------------------------------------
 std::string ToLower(const std::string& input)
 {
 	std::string result;
@@ -1186,7 +1204,6 @@ std::string ToLower(const std::string& input)
 	return result;
 };
 
-//---------------------------------------------------------------------------------------------------
 std::string ToUpper(const std::string& input)
 {
 	std::string result;
@@ -1195,8 +1212,6 @@ std::string ToUpper(const std::string& input)
 	return result;
 };
 
-//---------------------------------------------------------------------------------------------------
 std::string ToString(const std::wstring& input) { return std::string(input.begin(), input.end()); }
 
-//---------------------------------------------------------------------------------------------------
 std::wstring ToWString(const std::string& input) { return std::wstring(input.begin(), input.end()); }

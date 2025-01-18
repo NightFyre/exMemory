@@ -2,12 +2,18 @@
 `exMemory` is a C++ utility class designed for advanced memory manipulation tasks on external processes. It supports reading, writing, and scanning process memory, as well as managing process and module information. The class offers both static and instance-based operations for maximum flexibility.
 
 ## Features
-- Attach and detach from various processes.
+- Attach and detach from multiple processes.
 - Read and write to process memory (including pointer chains , strings & patterns).
 - Patch memory with custom bytes
 - enumerate modules and sections in a process.
 - Pattern scanning with optional instruction-based offsets.
 - Static methods for direct operations without maintaining an instance.
+
+## Potential Future Additions
+- Error Handling 
+- Various DLL Injection Methods
+- Code Cave Concepts
+- Module Dumping
 
 ---
 
@@ -23,7 +29,7 @@
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/exMemory.git
+git clone https://github.com/NightFyre/exMemory.git
 ```
 2. Include the exMemory.h file in your project:
 ```cpp
