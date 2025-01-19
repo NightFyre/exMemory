@@ -14,10 +14,10 @@ typedef unsigned int i64_t;
 #endif
 
 //	fwd declare helpers
-std::string ToLower(const std::string& input);
-std::string ToUpper(const std::string& input);
-std::string ToString(const std::wstring& input);
-std::wstring ToWString(const std::string& input);
+inline static std::string ToLower(const std::string& input);
+inline static std::string ToUpper(const std::string& input);
+inline static std::string ToString(const std::wstring& input);
+inline static std::wstring ToWString(const std::string& input);
 
 //	general process information
 typedef struct PROCESSINFO64
@@ -80,10 +80,10 @@ class exMemory
 			CONSTRUCTORS
 	*/
 public:
-	explicit exMemory() = default;	//	 default constructor | does nothing
-	explicit exMemory(const std::string& name);	//	attaches to process with all access rights
-	explicit exMemory(const std::string& name, const DWORD& dwAccess);	//	attaches to process with specified access rights
-	~exMemory() noexcept;	//	destructor | detaches from process if attached
+	explicit inline exMemory() = default;	//	 default constructor | does nothing
+	explicit inline exMemory(const std::string& name);	//	attaches to process with all access rights
+	explicit inline exMemory(const std::string& name, const DWORD& dwAccess);	//	attaches to process with specified access rights
+	inline ~exMemory() noexcept;	//	destructor | detaches from process if attached
 
 	/*//--------------------------\\
 			INSTANCE MEMBERS
@@ -103,30 +103,30 @@ private:
 public:
 
 	/* attempts to attach to a process by name */
-	virtual bool Attach(const std::string& name, const DWORD& dwAccess = PROCESS_ALL_ACCESS);
+	virtual inline bool Attach(const std::string& name, const DWORD& dwAccess = PROCESS_ALL_ACCESS);
 
 	/* detaches from the attached process */
-	virtual bool Detach();
+	virtual inline bool Detach();
 
 	/* verifies attached process is active & updates processinfo structure when needed */
-	virtual void update();
+	virtual inline void update();
 
 	/* returns the process information structure 
 	* see: procInfo_t or PROCESSINFO64
 	*/
-	const procInfo_t& GetProcessInfo() const { return vmProcess; }
+	inline const procInfo_t& GetProcessInfo() const { return vmProcess; }
 
 	/* returns an updated process list */
-	const std::vector<procInfo_t>& GetProcessList() const { return vmProcList; }
+	inline const std::vector<procInfo_t>& GetProcessList() const { return vmProcList; }
 	
 	/* returns a list containing all modules in the attached process */
-	const std::vector<modInfo_t>& GetModuleList() const { return vmModList; }
+	inline const std::vector<modInfo_t>& GetModuleList() const { return vmModList; }
 
 
 private:
 
 	/* helper method to determine if the current memory instance is attached to a process for handling various memory operations */
-	const bool IsValidInstance() noexcept { return !bAttached || !vmProcess.bAttached || vmProcess.hProc == INVALID_HANDLE_VALUE; }
+	inline const bool IsValidInstance() noexcept { return bAttached && vmProcess.bAttached && vmProcess.hProc != INVALID_HANDLE_VALUE; }
 
 
 public:
@@ -134,44 +134,45 @@ public:
 	/* reads a memory into a buffer at the specified address in the attached process
 	* returns true if all bytes were read
 	*/
-	bool ReadMemory(const i64_t& addr, void* buffer, const DWORD& szRead);
+	inline bool ReadMemory(const i64_t& addr, void* buffer, const DWORD& szRead);
 
 	/* attempts to write bytes in the attached process
 	* returns true if all bytes were written successfully
 	*/
-	bool WriteMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite);
+	inline bool WriteMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite);
 
 	/* reads a continguous string in at the specified address in the attached process
 	* returns true if the string was successfully read
 	*/
-	bool ReadString(const i64_t& addr, std::string& string, const DWORD& szString = MAX_PATH);
+	inline bool ReadString(const i64_t& addr, std::string& string, const DWORD& szString = MAX_PATH);
 
 	/* reads a chain of pointers in the attached process to find an address in memory
 	* returns the address if found
 	*/
-	i64_t ReadPointerChain(const i64_t& addr, std::vector<unsigned int>& offsets, i64_t* lpResult);
+	inline i64_t ReadPointerChain(const i64_t& addr, std::vector<unsigned int>& offsets, i64_t* lpResult);
 
 	/* attempts to patch a sequence of bytes in the attached process
 	* returns true if successful
 	*/
-	bool PatchMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite);
+	inline bool PatchMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite);
 
 	/* gets an address relative to the input named module base address */
-	i64_t GetAddress(const unsigned int& offset, i64_t* lpResult, const std::string& modName = "");
+	inline i64_t GetAddress(const unsigned int& offset, const std::string& modName = "");
+	inline bool GetAddress(const unsigned int& offset, i64_t* lpResult, const std::string& modName = "");
 
 	/* attempts to find a pattern in the attached process
 	* returns the address of pattern if found
 	*/
-	i64_t FindPattern(const std::string& signature, i64_t* result, int padding = 0, bool isRelative = false, EASM instruction = EASM::ASM_NULL);
+	inline i64_t FindPattern(const std::string& signature, i64_t* result, int padding = 0, bool isRelative = false, EASM instruction = EASM::ASM_NULL);
 
 	/* attempts to find a section header address in the attached process*/
-	i64_t GetSectionHeader(const ESECTIONHEADERS& section, i64_t* lpResult);
+	inline i64_t GetSectionHeader(const ESECTIONHEADERS& section, i64_t* lpResult);
 
 	/* attempts to obtain the address of a function located in the atteched processes export directory */
-	i64_t GetProcAddress(const std::string& fnName, i64_t* lpResult);
+	inline i64_t GetProcAddress(const std::string& fnName, i64_t* lpResult);
 
 	/* attempts to inject a module from disk into the attached process */
-	bool LoadLibraryInject(const std::string& dllPath);
+	inline bool LoadLibraryInject(const std::string& dllPath);
 
 
 public:
@@ -214,10 +215,10 @@ public:
 public:	//	methods for directly attaching to a process
 
 	/* attempts to attach to the named process with desired access level and returns a process information structure */
-	static bool AttachEx(const std::string& name, procInfo_t* lpProcess, const DWORD& dwDesiredAccess);
+	static inline bool AttachEx(const std::string& name, procInfo_t* lpProcess, const DWORD& dwDesiredAccess);
 
 	/* detaches from the attached process by freeing any opened handles to free the process information structure */
-	static bool DetachEx(procInfo_t& pInfo);
+	static inline bool DetachEx(procInfo_t& pInfo);
 
 
 public:	//	methods for retrieving information on a process by name , are somewhat slow and should not be used constantly. consider caching information if needed.
@@ -225,22 +226,22 @@ public:	//	methods for retrieving information on a process by name , are somewha
 	/* attempts to retrieve a process id by name
 	* utilizes FindProcessEx which iterates through ALL processes information before again searching through the procInfo list to return a match ( if any )
 	*/
-	static bool GetProcID(const std::string& procName, DWORD* outPID);
+	static inline bool GetProcID(const std::string& procName, DWORD* outPID);
 
 	/* attempts to obtain the module base address for the specified process name
 	* utilizes FindProcessEx which iterates through ALL processes information before again searching through the procInfo list to return a match ( if any )
 	*/
-	static bool GetModuleBaseAddress(const std::string& procName, i64_t* lpResult, const std::string& modName = "");
+	static inline bool GetModuleBaseAddress(const std::string& procName, i64_t* lpResult, const std::string& modName = "");
 
 	/* attempts to obtain information on a process without opening a handle to it
 	* utilizes FindProcessEx which iterates through ALL processes information before again searching through the procInfo list to return a match ( if any )
 	*/
-	static bool GetProcInfo(const std::string& name, procInfo_t* lpout);
+	static inline bool GetProcInfo(const std::string& name, procInfo_t* lpout);
 
 	/* determines if the specified name exists in the active process directory
 	* utilizes FindProcessEx which iterates through ALL processes information before again searching through the procInfo list to return a match ( if any )
 	*/
-	static bool IsProcessRunning(const std::string& name);
+	static inline bool IsProcessRunning(const std::string& name);
 
 
 public:	//	methods for obtaining info on active processes
@@ -248,40 +249,40 @@ public:	//	methods for obtaining info on active processes
 	/* obtains a list of all active processes on the machine that contains basic information on a process without requiring a handle 
 	* ref: https://learn.microsoft.com/en-us/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes
 	*/
-	static bool GetActiveProcessesEx(std::vector<procInfo_t>& procList);
+	static inline bool GetActiveProcessesEx(std::vector<procInfo_t>& procList);
 
 	/* obtains a list of all modules loaded in the attached process */
-	static bool GetProcessModulesEx(const DWORD& dwPID, std::vector< modInfo_t>& moduleList);
+	static inline bool GetProcessModulesEx(const DWORD& dwPID, std::vector< modInfo_t>& moduleList);
 
 	/* gets info on a process by name , can be extended to attach to the process if found
 	* utilizes GetActiveProcesses method which is somewhat slow as it obtains ALL processes before returning
 	*/
-	static bool FindProcessEx(const std::string& procName, procInfo_t* procInfo, const bool& bAttach, const DWORD& dwDesiredAccess);
+	static inline bool FindProcessEx(const std::string& procName, procInfo_t* procInfo, const bool& bAttach, const DWORD& dwDesiredAccess);
 
 	/* attempts to find a module by name located in the attached process and returns it's base address */
-	static bool FindModuleEx(const std::string& procName, const std::string& modName, modInfo_t* lpResult);
+	static inline bool FindModuleEx(const std::string& procName, const std::string& modName, modInfo_t* lpResult);
 
 public:	//	basic memory operations
 
 	/* attempts to read memory at the specified address from the target process */
-	static bool ReadMemoryEx(const HANDLE& hProc, const i64_t& addr, void* buffer, size_t szRead);
+	static inline bool ReadMemoryEx(const HANDLE& hProc, const i64_t& addr, void* buffer, size_t szRead);
 
 	/* attempts to write bytes to the specified address in memory from the target process */
-	static bool WriteMemoryEx(const HANDLE& hProc, const i64_t& addr, LPVOID buffer, DWORD szWrite);
+	static inline bool WriteMemoryEx(const HANDLE& hProc, const i64_t& addr, LPVOID buffer, DWORD szWrite);
 
 	/* attempts to read a string at the specified address in memory from the target process */
-	static bool ReadStringEx(const HANDLE& hProc, const i64_t& addr, const size_t& szString, std::string* lpResult);
+	static inline bool ReadStringEx(const HANDLE& hProc, const i64_t& addr, const size_t& szString, std::string* lpResult);
 
 	/* attempts to return an address located in memory via chain of offsets */
-	static bool ReadPointerChainEx(const HANDLE& hProc, const i64_t& addr, const std::vector<unsigned int>& offsets, i64_t* lpResult);
+	static inline bool ReadPointerChainEx(const HANDLE& hProc, const i64_t& addr, const std::vector<unsigned int>& offsets, i64_t* lpResult);
 
 	/* attempts to patch a sequence of bytes in the target process */
-	static bool PatchMemoryEx(const HANDLE& hProc, const i64_t& addr, const void* buffer, const DWORD& szWrite);
+	static inline bool PatchMemoryEx(const HANDLE& hProc, const i64_t& addr, const void* buffer, const DWORD& szWrite);
 
 public:	//	advanced methods for obtaining information on a process which requires a handle
 
 	/* attempts to find a module by name located in the attached process and returns it's base address */
-	static bool GetModuleAddressEx(const HANDLE& hProc, const std::string& moduleName, i64_t* lpResult);
+	static inline bool GetModuleAddressEx(const HANDLE& hProc, const std::string& moduleName, i64_t* lpResult);
 
 	/* attempts to return the address of a section header by index 
 	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_nt_headers64
@@ -289,26 +290,26 @@ public:	//	advanced methods for obtaining information on a process which require
 	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_optional_header64
 	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_section_header
 	*/
-	static bool GetSectionHeaderAddressEx(const HANDLE& hProc, const std::string& moduleName, const ESECTIONHEADERS& section, i64_t* lpResult, size_t* szImage);
-	static bool GetSectionHeaderAddressEx(const HANDLE& hProc, const i64_t& dwModule, const ESECTIONHEADERS& section, i64_t* lpResult, size_t* szImage);
+	static inline bool GetSectionHeaderAddressEx(const HANDLE& hProc, const std::string& moduleName, const ESECTIONHEADERS& section, i64_t* lpResult, size_t* szImage);
+	static inline bool GetSectionHeaderAddressEx(const HANDLE& hProc, const i64_t& dwModule, const ESECTIONHEADERS& section, i64_t* lpResult, size_t* szImage);
 
 	/* attempts to return an address located in memory via pattern scan. can be extended to extract bytes from an instruction 
 	* modifed version of -> https://www.unknowncheats.me/forum/3019469-post2.html 
 	*/
-	static bool FindPatternEx(const HANDLE& hProc, const std::string& moduleName, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction);
-	static bool FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction);
+	static inline bool FindPatternEx(const HANDLE& hProc, const std::string& moduleName, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction);
+	static inline bool FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction);
 
 	/* attempts to find an exported function by name and return the it's rva 
 	* https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_data_directory
 	*/
-	static bool GetProcAddressEx(const HANDLE& hProc, const std::string& moduleName, const std::string& fnName, i64_t* lpResult);
-	static bool GetProcAddressEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& fnName, i64_t* lpResult);
+	static inline bool GetProcAddressEx(const HANDLE& hProc, const std::string& moduleName, const std::string& fnName, i64_t* lpResult);
+	static inline bool GetProcAddressEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& fnName, i64_t* lpResult);
 
 
 public:	//	injection operations 
 
 	/* injects a module (from disk) into the target process using LoadLibrary */
-	static bool LoadLibraryInjectorEx(const HANDLE& hProc, const std::string& dllPath);
+	static inline bool LoadLibraryInjectorEx(const HANDLE& hProc, const std::string& dllPath);
 
 
 public:	//	template methods
@@ -354,7 +355,7 @@ private://	tools
 	/* callback for EnumWindows to find the maine process window 
 	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumwindows
 	*/
-	static BOOL CALLBACK GetProcWindowEx(HWND handle, LPARAM lParam);
+	static inline BOOL CALLBACK GetProcWindowEx(HWND handle, LPARAM lParam);
 };
 
 
@@ -445,7 +446,7 @@ bool exMemory::WriteMemory(const i64_t& addr, const void* buffer, const DWORD& s
 	if (!IsValidInstance())
 		return false;
 
-	return WriteMemoryEx(vmProcess.hProc, addr, &buffer, szWrite);
+	return WriteMemoryEx(vmProcess.hProc, addr, LPVOID(buffer), szWrite);
 }
 
 bool exMemory::PatchMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite)
@@ -467,18 +468,29 @@ i64_t exMemory::ReadPointerChain(const i64_t& addr, std::vector<unsigned int>& o
 	return *lpResult;
 }
 
-i64_t exMemory::GetAddress(const unsigned int& offset, i64_t* lpResult, const std::string& modName)
+i64_t exMemory::GetAddress(const unsigned int& offset, const std::string& modName)
 {
+	i64_t result = 0;
+	if (!GetAddress(offset, &result, modName))
+		return 0;
+
+	return result;
+}
+
+bool exMemory::GetAddress(const unsigned int& offset, i64_t* lpResult, const std::string& modName)
+{
+	i64_t result = 0;
 	if (!IsValidInstance())
 		return 0;
 
 	if (modName.empty())
-		return vmProcess.dwModuleBase + offset;
+		result = vmProcess.dwModuleBase + offset;
+	else if (!GetModuleAddressEx(vmProcess.hProc, modName, lpResult))
+		return false;
 
-	if (GetModuleAddressEx(vmProcess.hProc, modName, lpResult))
-		return 0;
+	*lpResult = result;
 
-	return *lpResult;
+	return result > 0;
 }
 
 i64_t exMemory::FindPattern(const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction)
@@ -1058,16 +1070,19 @@ bool exMemory::FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const s
 		switch (instruction)
 		{
 		case EASM::ASM_NULL: { result = address; break; }
-		case EASM::ASM_MOV: { const auto offset = ReadEx<int>(hProc, address + 3); return isRelative ? result = address + offset + 7 : result = address; }
-		case EASM::ASM_CALL: { const auto offset = ReadEx<int>(hProc, address + 1); return isRelative ? result = address + offset + 5 : result = address; }
-		case EASM::ASM_LEA: { const auto offset = ReadEx<int>(hProc, address + 3); return isRelative ? result = address + offset + 7 : result = address; }
-		case EASM::ASM_CMP: { const auto offset = ReadEx<int>(hProc, address + 2); return isRelative ? result = address + offset + 6 : result = address; }
+		case EASM::ASM_MOV: { const auto offset = ReadEx<int>(hProc, address + 3); return isRelative ? *lpResult = address + offset + 7 : result = address; }
+		case EASM::ASM_CALL: { const auto offset = ReadEx<int>(hProc, address + 1); return isRelative ? *lpResult = address + offset + 5 : result = address; }
+		case EASM::ASM_LEA: { const auto offset = ReadEx<int>(hProc, address + 3); return isRelative ? *lpResult = address + offset + 7 : result = address; }
+		case EASM::ASM_CMP: { const auto offset = ReadEx<int>(hProc, address + 2); return isRelative ? *lpResult = address + offset + 6 : result = address; }
 		}
 
 		break;
 	}
 
-	return result;
+
+	*lpResult = result;
+
+	return result > 0;
 }
 
 bool exMemory::GetProcAddressEx(const HANDLE& hProc, const std::string& moduleName, const std::string& fnName, i64_t* lpResult)
