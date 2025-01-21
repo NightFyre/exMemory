@@ -54,11 +54,11 @@ enum class EASM : int
 //	section headers index
 enum class ESECTIONHEADERS : int
 {
-	SECTION_TEXT = 0,
-	SECTION_DATA,
-	SECTION_RDATA,
-	SECTION_IMPORT,
-	SECTION_EXPORT,
+	SECTION_TEXT = 0,		//	.text
+	SECTION_DATA,			//	.data
+	SECTION_RDATA,			//	.rdata
+	SECTION_IMPORT,			//	IMPORTS TABLE
+	SECTION_EXPORT,			//	EXPORTS TABLE
 	SECTION_NULL
 };
 
@@ -102,13 +102,19 @@ protected:
 	*/
 public:
 
-	/* attempts to attach to a process by name */
+	/* attempts to attach to a process by name 
+	* virtualized to allow for custom behavior in derived classes
+	*/
 	virtual inline bool Attach(const std::string& name, const DWORD& dwAccess = PROCESS_ALL_ACCESS);
 
-	/* detaches from the attached process */
+	/* detaches from the attached process 
+	* virtualized to allow for custom behavior in derived classes
+	*/
 	virtual inline bool Detach();
 
-	/* verifies attached process is active & updates processinfo structure when needed */
+	/* verifies attached process is active & updates processinfo structure when needed 
+	* virtualized to allow for custom behavior in derived classes
+	*/
 	virtual inline void update();
 
 	/* returns the process information structure 
