@@ -117,6 +117,8 @@ public:
 	*/
 	virtual inline void update();
 
+
+public:
 	/* returns the process information structure 
 	* see: procInfo_t or PROCESSINFO64
 	*/
@@ -353,7 +355,11 @@ public:	//	template methods
 	static auto WriteEx(const HANDLE& hProc, const i64_t& addr, T patch) noexcept -> bool { return WriteMemoryEx(hProc, addr, &patch, sizeof(T)); }
 
 
-protected://	tools
+
+	/*//--------------------------\\
+			TOOL METHODS
+	*/
+protected:
 	struct EnumWindowData
 	{
 		unsigned int procId;
