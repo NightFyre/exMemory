@@ -170,8 +170,8 @@ public:
 	* returns the address of pattern if found
 	*/
 	inline i64_t FindPattern(const std::string& signature);
-	inline i64_t FindPattern(const std::string& signature, int padding = 0);
-	inline i64_t FindPattern(const std::string& signature, int padding = 0, EASM instruction = EASM::ASM_NULL);
+	inline i64_t FindPattern(const std::string& signature, int padding);
+	inline i64_t FindPattern(const std::string& signature, int padding, EASM instruction);
 
 	/* attempts to find a section header address in the attached process*/
 	inline i64_t GetSectionHeader(const ESECTIONHEADERS& section, i64_t* lpResult);
