@@ -41,24 +41,24 @@ typedef struct MODULEINFO64
 	std::string						mModName{ "" };						//	module name
 } MODULEINFO32 , modInfo_t;
 
-//	assembly opcode index
+//	assembly opcode index for ripping an offset from an instruction in memory
 enum class EASM : int
 {
-	ASM_MOV = 0,
-	ASM_LEA,
-	ASM_CMP,
-	ASM_CALL,
+	ASM_MOV = 0,		//	mov rax,[proc.exe+offset]	; 0x48 0x8B 0x05 ?? ?? ?? ??
+	ASM_LEA,			//	lea rax,[proc.exe+offset]	; 0x48 0x8D 0x05 ?? ?? ?? ??
+	ASM_CMP,			//	cmp rax,[proc.exe+offset]	; 0x48 0x3B 0x05 ?? ?? ?? ??
+	ASM_CALL,			//	call proc.exe+offset		; 0xE8 ?? ?? ?? ??
 	ASM_NULL
 };
 
 //	section headers index
 enum class ESECTIONHEADERS : int
 {
-	SECTION_TEXT = 0,
-	SECTION_DATA,
-	SECTION_RDATA,
-	SECTION_IMPORT,
-	SECTION_EXPORT,
+	SECTION_TEXT = 0,		//	.text
+	SECTION_DATA,			//	.data
+	SECTION_RDATA,			//	.rdata
+	SECTION_IMPORT,			//	IMPORTS TABLE
+	SECTION_EXPORT,			//	EXPORTS TABLE
 	SECTION_NULL
 };
 
@@ -92,7 +92,7 @@ public:
 	bool						bAttached;	//	attached to a process
 	double						mFrequency;	//	update frequency in ms
 
-private:
+protected:
 	procInfo_t					vmProcess;	//	attached process information
 	std::vector<procInfo_t>		vmProcList;	//	active process list
 	std::vector<modInfo_t>		vmModList;	//	module list for attached process
@@ -102,15 +102,23 @@ private:
 	*/
 public:
 
-	/* attempts to attach to a process by name */
+	/* attempts to attach to a process by name 
+	* virtualized to allow for custom behavior in derived classes
+	*/
 	virtual inline bool Attach(const std::string& name, const DWORD& dwAccess = PROCESS_ALL_ACCESS);
 
-	/* detaches from the attached process */
+	/* detaches from the attached process 
+	* virtualized to allow for custom behavior in derived classes
+	*/
 	virtual inline bool Detach();
 
-	/* verifies attached process is active & updates processinfo structure when needed */
+	/* verifies attached process is active & updates processinfo structure when needed 
+	* virtualized to allow for custom behavior in derived classes
+	*/
 	virtual inline void update();
 
+
+public:
 	/* returns the process information structure 
 	* see: procInfo_t or PROCESSINFO64
 	*/
@@ -123,7 +131,7 @@ public:
 	inline const std::vector<modInfo_t>& GetModuleList() const { return vmModList; }
 
 
-private:
+protected:
 
 	/* helper method to determine if the current memory instance is attached to a process for handling various memory operations */
 	inline const bool IsValidInstance() noexcept { return bAttached && vmProcess.bAttached && vmProcess.hProc != INVALID_HANDLE_VALUE; }
@@ -163,7 +171,9 @@ public:
 	/* attempts to find a pattern in the attached process
 	* returns the address of pattern if found
 	*/
-	inline i64_t FindPattern(const std::string& signature, i64_t* result, int padding = 0, bool isRelative = false, EASM instruction = EASM::ASM_NULL);
+	inline i64_t FindPattern(const std::string& signature);
+	inline i64_t FindPattern(const std::string& signature, int padding);
+	inline i64_t FindPattern(const std::string& signature, int padding, EASM instruction);
 
 	/* attempts to find a section header address in the attached process*/
 	inline i64_t GetSectionHeader(const ESECTIONHEADERS& section, i64_t* lpResult);
@@ -296,8 +306,8 @@ public:	//	advanced methods for obtaining information on a process which require
 	/* attempts to return an address located in memory via pattern scan. can be extended to extract bytes from an instruction 
 	* modifed version of -> https://www.unknowncheats.me/forum/3019469-post2.html 
 	*/
-	static inline bool FindPatternEx(const HANDLE& hProc, const std::string& moduleName, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction);
-	static inline bool FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction);
+	static inline bool FindPatternEx(const HANDLE& hProc, const std::string& moduleName, const std::string& signature, i64_t* lpResult, int padding, EASM instruction);
+	static inline bool FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& signature, i64_t* lpResult, int padding, EASM instruction);
 
 	/* attempts to find an exported function by name and return the it's rva 
 	* https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_data_directory
@@ -345,7 +355,11 @@ public:	//	template methods
 	static auto WriteEx(const HANDLE& hProc, const i64_t& addr, T patch) noexcept -> bool { return WriteMemoryEx(hProc, addr, &patch, sizeof(T)); }
 
 
-private://	tools
+
+	/*//--------------------------\\
+			TOOL METHODS
+	*/
+protected:
 	struct EnumWindowData
 	{
 		unsigned int procId;
@@ -493,15 +507,40 @@ bool exMemory::GetAddress(const unsigned int& offset, i64_t* lpResult, const std
 	return result > 0;
 }
 
-i64_t exMemory::FindPattern(const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction)
+i64_t exMemory::FindPattern(const std::string& signature)
 {
 	if (!IsValidInstance())
 		return 0;
 
-	if (!FindPatternEx(vmProcess.hProc, vmProcess.dwModuleBase, signature, lpResult, padding, isRelative, instruction))
+	i64_t result = 0;
+	if (!FindPatternEx(vmProcess.hProc, vmProcess.dwModuleBase, signature, &result, 0, EASM::ASM_NULL))
 		return 0;
 
-	return *lpResult;
+	return result;
+}
+
+i64_t exMemory::FindPattern(const std::string& signature, int padding)
+{
+	if (!IsValidInstance())
+		return 0;
+
+	i64_t result = 0;
+	if (!FindPatternEx(vmProcess.hProc, vmProcess.dwModuleBase, signature, &result, padding, EASM::ASM_NULL))
+		return 0;
+
+	return result;
+}
+
+i64_t exMemory::FindPattern(const std::string& signature, int padding, EASM instruction)
+{
+	if (!IsValidInstance())
+		return 0;
+
+	i64_t result = 0;
+	if (!FindPatternEx(vmProcess.hProc, vmProcess.dwModuleBase, signature, &result, padding, instruction))
+		return 0;
+
+	return result;
 }
 
 i64_t exMemory::GetSectionHeader(const ESECTIONHEADERS& section, i64_t* lpResult)
@@ -993,16 +1032,16 @@ bool exMemory::GetSectionHeaderAddressEx(const HANDLE& hProc, const i64_t& dwMod
 	return true;
 }
 
-bool exMemory::FindPatternEx(const HANDLE& hProc, const std::string& moduleName, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction)
+bool exMemory::FindPatternEx(const HANDLE& hProc, const std::string& moduleName, const std::string& signature, i64_t* lpResult, int padding, EASM instruction)
 {
 	i64_t dwModuleBase = 0;
 	if (!GetModuleAddressEx(hProc, moduleName, &dwModuleBase) || !dwModuleBase)
 		return false;
 
-	return FindPatternEx(hProc, dwModuleBase, signature, lpResult, padding, isRelative, instruction);
+	return FindPatternEx(hProc, dwModuleBase, signature, lpResult, padding, instruction);
 }
 
-bool exMemory::FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction)
+bool exMemory::FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& signature, i64_t* lpResult, int padding, EASM instruction)
 {
 	static auto pattern_to_byte = [](const char* pattern)
 		{
@@ -1063,17 +1102,44 @@ bool exMemory::FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const s
 		auto address = section_base + i;
 
 		//	apply optional padding
-		if (padding != NULL)
-			address += padding;
+		address += padding;
 
-		//	pull offset from instruction
+		//	rip offset from instruction
 		switch (instruction)
 		{
-		case EASM::ASM_NULL: { result = address; break; }
-		case EASM::ASM_MOV: { const auto offset = ReadEx<int>(hProc, address + 3); return isRelative ? *lpResult = address + offset + 7 : result = address; }
-		case EASM::ASM_CALL: { const auto offset = ReadEx<int>(hProc, address + 1); return isRelative ? *lpResult = address + offset + 5 : result = address; }
-		case EASM::ASM_LEA: { const auto offset = ReadEx<int>(hProc, address + 3); return isRelative ? *lpResult = address + offset + 7 : result = address; }
-		case EASM::ASM_CMP: { const auto offset = ReadEx<int>(hProc, address + 2); return isRelative ? *lpResult = address + offset + 6 : result = address; }
+		case EASM::ASM_NULL: 
+		{ 
+			//	just return the address
+			result = address; 
+			break; 
+		}
+		case EASM::ASM_MOV: //	mov rax,[proc.exe+offset]	; 0x48 0x8B 0x05 ?? ?? ?? ??
+		{ 
+			const auto offset = ReadEx<int>(hProc, address + 3); 
+			result = (address + offset) + 7;	// 7 = sizeof instruction
+			break;
+		}	
+		case EASM::ASM_CALL: //	call proc.exe+offset		; 0xE8 ?? ?? ?? ??
+		{ 
+			const auto offset = ReadEx<int>(hProc, address + 1); 
+			result = (address + offset) + 5; 	// 5 = sizeof instruction
+			break;
+		}	
+		case EASM::ASM_LEA: //	lea rax,[proc.exe+offset]	; 0x48 0x8D 0x05 ?? ?? ?? ??
+		{ 
+			const auto offset = ReadEx<int>(hProc, address + 3); 
+			result = (address + offset) + 7;	// 7 = sizeof instruction
+			break;
+		}	
+		case EASM::ASM_CMP: //	cmp rax,[proc.exe+offset]	; 0x48 0x3B 0x05 ?? ?? ?? ??
+		{ 
+			const auto offset = ReadEx<int>(hProc, address + 2); 
+			result = (address + offset) + 6;	// 6 = sizeof instruction
+			break;
+		}	
+
+		default: 
+			return false;
 		}
 
 		break;
