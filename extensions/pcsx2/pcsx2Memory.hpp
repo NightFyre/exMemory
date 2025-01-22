@@ -1,4 +1,4 @@
-#include <exMemory/exMemory.hpp>
+#include <exMemory.hpp>
 
 struct pcsx2PROCESSINFO : public PROCESSINFO64
 {
@@ -335,6 +335,7 @@ bool pcsx2Memory::recResetEE()
 {
 	/* recRestEE is a boolean flag in the pcsx2-qt.exe process that is used to reset EE before it tries to execute any code, if pending.
 	* flag: https://github.com/PCSX2/pcsx2/blob/f2c796bcc528b0366b1dec4fc471414efab9b1db/pcsx2/x86/ix86-32/iR5900.cpp#L43
+	* discussion: https://github.com/PCSX2/pcsx2/pull/10143
 	*/
 	static i64_t recNeedsReset = 0;
 	if (!recNeedsReset)
