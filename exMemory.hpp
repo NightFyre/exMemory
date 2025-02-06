@@ -883,7 +883,6 @@ bool exMemory::FindProcessEx(const std::string& procName, procInfo_t* procInfo, 
 			proc.bAttached = proc.hProc != INVALID_HANDLE_VALUE;
 		}
 		
-
 		*procInfo = proc;
 
 		result = true;
@@ -891,7 +890,6 @@ bool exMemory::FindProcessEx(const std::string& procName, procInfo_t* procInfo, 
 		CloseHandle(modSnap);
 		
 		break;
-
 	} while (Process32Next(hSnap, &procEntry));
 
 	CloseHandle(hSnap);
