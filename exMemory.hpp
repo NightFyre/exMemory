@@ -818,28 +818,51 @@ bool exMemory::GetProcessModulesEx(const DWORD& dwPID, std::vector<modInfo_t>& l
 
 bool exMemory::FindProcessEx(const std::string& procName, procInfo_t* procInfo, const bool& bAttach, const DWORD& dwDesiredAccess)
 {
-	std::vector<procInfo_t> list;
-	if (!GetActiveProcessesEx(list))
-		return false;
+	bool result = false;
+	const auto& input = ToLower(procName);
 
-	auto it = std::find_if(
-		list.begin(),
-		list.end(),
-		[procName](procInfo_t& p)
-		{
-			return p.mProcName == procName;
-		}
-	);
+	//	create process snapshot
+	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (hSnap == INVALID_HANDLE_VALUE)
+		return FALSE;
 
-	if (it == list.end())
-		return false;
-
-	procInfo_t& proc = *it;	//	pass found procInfo reference
-
-	//	attach to process ?
-	if (bAttach)
+	//	get first entry
+	PROCESSENTRY32 procEntry;
+	procEntry.dwSize = sizeof(procEntry);
+	if (!Process32Next(hSnap, &procEntry))
 	{
-		proc.dwAccessLevel = dwDesiredAccess;
+		CloseHandle(hSnap);
+		return FALSE;
+	}
+
+	//  iterate through all processes
+	do
+	{
+		//	compare names
+		if (ToLower(ToString(procEntry.szExeFile)) != input)
+			continue;
+
+		//	snapshot modules
+		HANDLE modSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPPROCESS, procEntry.th32ProcessID);
+		if (modSnap == INVALID_HANDLE_VALUE)
+			break;
+
+		// get first entry
+		MODULEENTRY32 modEntry;
+		modEntry.dwSize = sizeof(modEntry);
+		if (!Module32First(modSnap, &modEntry))
+		{
+			CloseHandle(modSnap);
+			break;
+		}
+
+		//	module found
+		procInfo_t proc;
+		proc.mProcName = ToString(procEntry.szExeFile);      //  process name
+		proc.mProcPath = ToString(modEntry.szExePath);       //  process path
+		proc.dwPID = procEntry.th32ProcessID;				//  process ID
+		proc.dwModuleBase = i64_t(modEntry.modBaseAddr);	//  module base address
+		proc.dwAccessLevel = dwDesiredAccess;				//  desired access level
 
 		//  attempt to get main process window
 		EnumWindowData eDat;
@@ -853,15 +876,21 @@ bool exMemory::FindProcessEx(const std::string& procName, procInfo_t* procInfo, 
 			proc.mWndwTitle = std::string(buffer);
 
 		//  open handle to process
-		proc.hProc = OpenProcess(proc.dwAccessLevel, false, it->dwPID);
-
+		if (dwDesiredAccess > 0)
+			proc.hProc = OpenProcess(proc.dwAccessLevel, false, proc.dwPID);
+	
 		proc.bAttached = proc.hProc != INVALID_HANDLE_VALUE;
-	}
+		result = true;
 
-	if (procInfo)
-		*procInfo = proc;
+		CloseHandle(modSnap);
+		
+		break;
 
-	return true;
+	} while (Process32Next(hSnap, &procEntry));
+
+	CloseHandle(hSnap);
+
+	return result;
 }
 
 bool exMemory::FindModuleEx(const std::string& procName, const std::string& modName, modInfo_t* lpResult)
