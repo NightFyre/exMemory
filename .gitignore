@@ -4,6 +4,12 @@
 # unignore .gitignore
 !.gitignore
 
+# unignore directories
+!*/
+
+# unignore source files in directories
+!**/*.hpp
+
 # unignore source file
 !exMemory.hpp
 !README.md
