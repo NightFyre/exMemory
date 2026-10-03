@@ -1,224 +1,151 @@
 # exMemory
-`exMemory` is a C++ utility class designed for advanced memory manipulation tasks on external processes. It supports reading, writing, and scanning process memory, as well as managing process and module information. The class offers both static and instance-based operations for maximum flexibility.
+
+`exMemory` is a lightweight, single-header C++ utility for interacting with external processes on Windows.
+
+It provides both instance-based and static interfaces for process attachment, memory access, process and module enumeration, window discovery, pattern scanning, PE inspection, export resolution, and basic DLL injection.
 
 ## Features
-- Attach and detach from multiple processes.
-- Read and write to process memory (including pointer chains , strings & patterns).
-- Patch memory with custom bytes
-- enumerate modules and sections in a process.
-- Pattern scanning with optional instruction-based offsets.
-- Static methods for direct operations without maintaining an instance.
 
-## Potential Future Additions
-- Error Handling 
-- Various DLL Injection Methods
-- Code Cave Concepts
-- Module Dumping
-
----
+- Single-header implementation
+- Process attachment and management
+- Read and write external process memory
+- String and multi-level pointer chain support
+- Protected memory patching
+- Process and module enumeration
+- Process window enumeration and automatic window selection
+- Pattern scanning with wildcard support
+- Relative address resolution for common x64 instructions
+- PE section inspection
+- Export table resolution
+- LoadLibrary DLL injection
+- Instance-based and static APIs
 
 ## Getting Started
 
-### Prerequisites
+### Requirements
 
-- Windows operating system
-- A modern C++ compiler (e.g., MSVC)
-- `Windows.h` header for Windows API
+- Windows
+- C++11 or newer
+- Windows API
+- MSVC recommended
 
 ### Installation
 
-1. Clone the repository:
+Clone the repository:
+
 ```bash
 git clone https://github.com/NightFyre/exMemory.git
 ```
-2. Include the exMemory.h file in your project:
+
+Include the header:
+
 ```cpp
 #include "exMemory.hpp"
 ```
 
-## Usage
-You can use `exMemory` in two ways: instance-based or through static methods. 
-The following examples each demonstrate attaching to a process and reading the IMAGE_DOS_HEADER section before detaching from the process.
+No additional source files are required.
 
-**Instance-Based Example**
+## Quick Example
+
 ```cpp
 #include "exMemory.hpp"
 
-int main() 
+int main()
 {
-    exMemory mem = exMemory("pcsx2-qt.exe", PROCESS_ALL_ACCESS);
-    const auto& pInfo = mem.GetProcessInfo();
-    if (pInfo.bAttached)
-    {
-        const auto& value = mem.Read<IMAGE_DOS_HEADER>(pInfo.dwModuleBase);
+    exMemory mem("pcsx2-qt.exe");
 
-        memory.Detach();
-    }
-    
+    if (!mem.bAttached)
+        return 1;
+
+    const auto& proc = mem.GetProcessInfo();
+
+    const auto dosHeader =
+        mem.Read<IMAGE_DOS_HEADER>(proc.dwModuleBase);
+
     return 0;
 }
 ```
 
-**Static Method Example**
-```cpp
-#include "exMemory.hpp"
+For usage examples and API documentation, see **[USAGE.md](USAGE.md)**.
 
-int main() 
+## API Overview
+
+`exMemory` provides two ways to interact with a process.
+
+### Instance API
+
+Designed for applications that maintain an active process connection:
+
+```cpp
+exMemory mem("pcsx2-qt.exe");
+
+auto value = mem.Read<int>(address);
+
+mem.Write<int>(address, value);
+```
+
+### Static API
+
+The `Ex` methods provide direct operations without requiring an `exMemory` instance:
+
+```cpp
+procInfo_t proc{};			// process info structure ( pid , handle , module base address . . . )
+
+if (exMemory::AttachEx(
+    "pcsx2-qt.exe",			// process name
+    &proc,					// handle to process info
+    PROCESS_ALL_ACCESS		// desired access level
+))
 {
-    procInfo_t proc;
-    if (exMemory::AttachEx("pcsx2-qt.exe", &proc, PROCESS_ALL_ACCESS))  //  attach to named process with desired access
-    {
-        const auto& value = exMemory::ReadEx<IMAGE_DOS_HEADER>(pInfo.hProc, pInfo.dwModuleBase);    //  read the dos header section
-        
-        exMemory::DetachEx(proc);
-    }
-    
-    return 0;
-}
-```
+    auto value = exMemory::ReadEx<int>(proc.hProc, address);
 
-## Key Methods
-
-**Instance Methods**
-- Attach/Detach
-```cpp
-
-//  Constructor
-exMemory mem = exMemory("pcsx2-qt.exe");    //  attaches to pcsx2 process with default PROCESS_ALL_ACCESS rights , process information is accessible via 'mem.GetProcessInfo()'
-
-//  custom , can also be used to overwrite existing attached process
-bool Attach(const std::string& name, const DWORD& dwAccess = PROCESS_ALL_ACCESS);   //  attaches to named process with desired access
-bool Detach();  //  detaches from the attached process
-```
-
-- Read/Write Memory
-```cpp
-// 
-bool ReadMemory(const i64_t& addr, void* buffer, const DWORD& szRead);
-bool ReadString(const i64_t& addr, std::string& string, const DWORD& szString = MAX_PATH);
-bool WriteMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite);
-bool PatchMemory(const i64_t& addr, const void* buffer, const DWORD& szWrite);
-
-//  template
-template<typename T>
-T Read(const i64_t& addr);
-
-template<typename T>
-bool Write(const i64_t& addr, T value);
-```
-
-- Pointer Chains & Pattern Scanning
-```cpp
-i64_t ReadPointerChain(const i64_t& addr, std::vector<unsigned int>& offsets, i64_t* lpResult);
-i64_t FindPattern(const std::string& signature, i64_t* result, int padding = 0, bool isRelative = false, EASM instruction = EASM::ASM_NULL);
-```
-
-**Static Methods**
-- Attach/Detach
-```cpp
-static bool AttachEx(const std::string& name, procInfo_t* lpProcess, const DWORD& dwDesiredAccess);
-static bool DetachEx(procInfo_t& pInfo);
-```
-
-- Direct Memory Operations
-```cpp
-//  methods
-static bool ReadMemoryEx(const HANDLE& hProc, const i64_t& addr, void* buffer, size_t szRead);
-static bool ReadStringEx(const HANDLE& hProc, const i64_t& addr, const size_t& szString, std::string* lpResult);
-static bool WriteMemoryEx(const HANDLE& hProc, const i64_t& addr, LPVOID buffer, DWORD szWrite);
-static bool PatchMemoryEx(const HANDLE& hProc, const i64_t& addr, const void* buffer, const DWORD& szWrite);
-
-//  templates
-template<typename T>
-T ReadEx(const HANDLE& hProc, const i64_t& addr);
-
-template<typename T>
-bool WriteEx(const HANDLE& hProc, const i64_t& addr, T value);
-```
-
-- Pointer Chains & Pattern Scanning
-```cpp
-static bool ReadPointerChainEx(const HANDLE& hProc, const i64_t& addr, const std::vector<unsigned int>& offsets, i64_t* lpResult);
-static bool FindPatternEx(const HANDLE& hProc, const std::string& moduleName, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction);
-static bool FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& signature, i64_t* lpResult, int padding, bool isRelative, EASM instruction);
-```
-
-## Advanced Features & Examples
-The following examples all make use of static methods for readability.
-
-**Pointer Chains**
-- Resolve multi-level pointer chains
-```cpp
-procInfo_t proc;
-if (exMemory::AttachEx("pcsx2-qt.exe", &proc, PROCESS_ALL_ACCESS))
-{
-	i64_t result;
-	std::vector<unsigned int> offsets = { 0x1C , 0x30 };
-	exMemory::ReadPointerChainEx(proc.hProc, 0x44D548, offsets, &result);
-
-	//	...
-
-	exMemory::DetachEx(proc);
-}
-```
-
-**Pattern Scanning**
-- Find memory patterns with custom instructions and offsets
-```cpp
-i64_t address = memory.FindPattern("90 90 ?? ?? E8 ?? ?? ?? ??", nullptr, 0, false);
-```
-
-**Section Walking**
-- Get the base address of a section within a loaded module in an attached processes
-```cpp
-procInfo_t proc;
-if (exMemory::AttachEx("pcsx2-qt.exe", &proc, PROCESS_ALL_ACCESS))
-{
-	size_t szSection = 0;
-	i64_t SectionHeader = 0;
-	exMemory::GetSectionHeaderAddressEx(pInfo.hProc, "pcsx2-qt.exe", ESECTIONHEADERS::SECTION_TEXT, &SectionHeader, &szSection);
-	
-    //	...
-	
     exMemory::DetachEx(proc);
 }
-
 ```
 
-**Resolve Export Table Entries**
-- Retrieve the address of an exported function
-```cpp
-procInfo_t proc;
-if (exMemory::AttachEx("pcsx2-qt.exe", &proc, PROCESS_ALL_ACCESS))
-{
-    i64_t EEmem = 0;
-	exMemory::GetProcAddressEx(proc.hProc, "pcsx2-qt.exe", "EEmem", &EEmem);
-	
-    //	...
+## Core Components
 
-	exMemory::DetachEx(proc);
-}
-```
+| Type | Description |
+| --- | --- |
+| `exMemory` | Main external process interface |
+| `procInfo_t` | Process information and attachment state |
+| `modInfo_t` | Loaded module information |
+| `wndwInfo_t` | Process window information |
+| `EASM` | Instruction types used for relative address resolution |
+| `ESECTIONHEADERS` | Supported PE section identifiers |
+| `EINJECTION` | Injection method identifiers |
 
-## Enums and Structures
-**Enums**
-- EASM: Assembly instruction types (e.g., ASM_MOV, ASM_CALL).
-- ESECTIONHEADERS: Section headers in a PE file (e.g., .text, .data).
-- EINJECTION: Injection types (e.g., LOADLIBRARY, MANUAL).
+## Documentation
 
-**Structures**
-- procInfo_t: Represents process information (ID, handle, base address, etc.).
-- modInfo_t: Represents module information (base address, name, etc.).
+See **[USAGE.md](USAGE.md)** for examples covering:
 
-## Performance Considerations
-- Instance methods are optimized for scenarios where a process is frequently accessed.
-- Static methods are ideal for one-off operations without maintaining a persistent state.
-- Try to avoid repeated calls to slow methods such as `GetActiveProcessesEx` and instead prefer to cache and update results.
+- Process attachment
+- Reading and writing memory
+- Pointer chains
+- Pattern scanning
+- Process and module enumeration
+- Process window enumeration
+- PE section walking
+- Export resolution
+- DLL injection
+
+## Potential Future Additions
+
+- Improved error reporting
+- Additional DLL injection methods
+- Code cave utilities
+- Module dumping
 
 ## Resources
-- [GuidedHacking](https://guidedhacking.com)
-- [UnknownCheats](https://unknowncheats.me/)
-- [WinApi Process Enumeration](https://learn.microsoft.com/en-us/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes)
-- [WinApi About Memory Management](https://learn.microsoft.com/en-us/windows/win32/memory/about-memory-management)
-- [WinApi Virtual Memory Functions](https://learn.microsoft.com/en-us/windows/win32/Memory/virtual-memory-functions)
-- [WinApi Memory Management Reference](https://learn.microsoft.com/en-us/windows/win32/memory/memory-management-reference)
+
+- [Windows Process Enumeration](https://learn.microsoft.com/en-us/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes)
+- [Windows Memory Management](https://learn.microsoft.com/en-us/windows/win32/memory/about-memory-management)
+- [Virtual Memory Functions](https://learn.microsoft.com/en-us/windows/win32/memory/virtual-memory-functions)
+- [EnumWindows](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumwindows)
+- [PE Format](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format)
+
+---
+
+### NightFyre Frameworks
+
+`exMemory` is provided as a lightweight utility for external process tooling and research.
