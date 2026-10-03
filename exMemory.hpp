@@ -1,3 +1,11 @@
+// ============================================================================
+//  NightFyre Frameworks
+//  exMemory - External Process Memory Interface
+//
+//  Lightweight utilities for process attachment, module enumeration,
+//  memory access, and process window management.
+// ============================================================================
+
 #pragma once
 #include <windows.h>
 #include <TlHelp32.h>
@@ -31,7 +39,7 @@ typedef struct PROCESSINFO64
 	std::string						mProcName{ "" };						//	process name
 	std::string						mProcPath{ "" };						//	process path
 	std::string						mWndwTitle{ "" };						//	process window title
-} PROCESSINFO32 , procInfo_t;
+} PROCESSINFO32, procInfo_t;
 
 //	general module information
 typedef struct MODULEINFO64
@@ -39,7 +47,27 @@ typedef struct MODULEINFO64
 	DWORD							dwPID{ 0 };							//	owning process id
 	i64_t							dwModuleBase{ 0 };					//	module base address in process
 	std::string						mModName{ "" };						//	module name
-} MODULEINFO32 , modInfo_t;
+} MODULEINFO32, modInfo_t;
+
+typedef struct WINDOWINFO64
+{
+	HWND hWnd{ nullptr };
+
+	std::string mTitle;
+	std::string mClassName;
+
+	int mWidth{ 0 };
+	int mHeight{ 0 };
+
+	bool bVisible{ false };
+	bool bOwned{ false };
+	bool bToolWindow{ false };
+
+	LONG64 GetArea() const
+	{
+		return static_cast<LONG64>(mWidth) * mHeight;
+	}
+}WINDOWINFO32, wndwInfo_t;
 
 //	assembly opcode index for ripping an offset from an instruction in memory
 enum class EASM : int
@@ -71,8 +99,8 @@ enum class EINJECTION : int
 };
 
 /*
-* 
-* 
+*
+*
 */
 class exMemory
 {
@@ -102,31 +130,31 @@ protected:
 	*/
 public:
 
-	/* attempts to attach to a process by name 
+	/* attempts to attach to a process by name
 	* virtualized to allow for custom behavior in derived classes
 	*/
 	virtual inline bool Attach(const std::string& name, const DWORD& dwAccess = PROCESS_ALL_ACCESS);
 
-	/* detaches from the attached process 
+	/* detaches from the attached process
 	* virtualized to allow for custom behavior in derived classes
 	*/
 	virtual inline bool Detach();
 
-	/* verifies attached process is active & updates processinfo structure when needed 
+	/* verifies attached process is active & updates processinfo structure when needed
 	* virtualized to allow for custom behavior in derived classes
 	*/
 	virtual inline void update();
 
 
 public:
-	/* returns the process information structure 
+	/* returns the process information structure
 	* see: procInfo_t or PROCESSINFO64
 	*/
 	inline const procInfo_t& GetProcessInfo() const { return vmProcess; }
 
 	/* returns an updated process list */
 	inline const std::vector<procInfo_t>& GetProcessList() const { return vmProcList; }
-	
+
 	/* returns a list containing all modules in the attached process */
 	inline const std::vector<modInfo_t>& GetModuleList() const { return vmModList; }
 
@@ -256,13 +284,19 @@ public:	//	methods for retrieving information on a process by name , are somewha
 
 public:	//	methods for obtaining info on active processes
 
-	/* obtains a list of all active processes on the machine that contains basic information on a process without requiring a handle 
+	/* obtains a list of all active processes on the machine that contains basic information on a process without requiring a handle
 	* ref: https://learn.microsoft.com/en-us/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes
 	*/
 	static inline bool GetActiveProcessesEx(std::vector<procInfo_t>& procList);
 
 	/* obtains a list of all modules loaded in the attached process */
 	static inline bool GetProcessModulesEx(const DWORD& dwPID, std::vector< modInfo_t>& moduleList);
+
+	/* obtains all top-level windows belonging to the specified process */
+	static inline bool GetProcessWindowsEx(const DWORD& dwPID, std::vector<wndwInfo_t>& windowList);
+
+	/* attempts to determine the primary window belonging to the specified process */
+	static inline HWND GetProcessWindowEx(const DWORD& dwPID);
 
 	/* gets info on a process by name , can be extended to attach to the process if found
 	* utilizes GetActiveProcesses method which is somewhat slow as it obtains ALL processes before returning
@@ -294,7 +328,7 @@ public:	//	advanced methods for obtaining information on a process which require
 	/* attempts to find a module by name located in the attached process and returns it's base address */
 	static inline bool GetModuleAddressEx(const HANDLE& hProc, const std::string& moduleName, i64_t* lpResult);
 
-	/* attempts to return the address of a section header by index 
+	/* attempts to return the address of a section header by index
 	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_nt_headers64
 	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_file_header
 	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_optional_header64
@@ -303,13 +337,13 @@ public:	//	advanced methods for obtaining information on a process which require
 	static inline bool GetSectionHeaderAddressEx(const HANDLE& hProc, const std::string& moduleName, const ESECTIONHEADERS& section, i64_t* lpResult, size_t* szImage);
 	static inline bool GetSectionHeaderAddressEx(const HANDLE& hProc, const i64_t& dwModule, const ESECTIONHEADERS& section, i64_t* lpResult, size_t* szImage);
 
-	/* attempts to return an address located in memory via pattern scan. can be extended to extract bytes from an instruction 
-	* modifed version of -> https://www.unknowncheats.me/forum/3019469-post2.html 
+	/* attempts to return an address located in memory via pattern scan. can be extended to extract bytes from an instruction
+	* modifed version of -> https://www.unknowncheats.me/forum/3019469-post2.html
 	*/
 	static inline bool FindPatternEx(const HANDLE& hProc, const std::string& moduleName, const std::string& signature, i64_t* lpResult, int padding, EASM instruction);
 	static inline bool FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const std::string& signature, i64_t* lpResult, int padding, EASM instruction);
 
-	/* attempts to find an exported function by name and return the it's rva 
+	/* attempts to find an exported function by name and return the it's rva
 	* https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_data_directory
 	*/
 	static inline bool GetProcAddressEx(const HANDLE& hProc, const std::string& moduleName, const std::string& fnName, i64_t* lpResult);
@@ -364,12 +398,14 @@ protected:
 	{
 		unsigned int procId;
 		HWND hwnd;
+		LONG64 area{ 0 };
+		std::vector<wndwInfo_t>* windowList{ 0 };
 	};
 
-	/* callback for EnumWindows to find the maine process window 
+	/* callback for EnumWindows to find the maine process window
 	* ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumwindows
 	*/
-	static inline BOOL CALLBACK GetProcWindowEx(HWND handle, LPARAM lParam);
+	static inline BOOL CALLBACK EnumProcessWindowsEx(HWND handle, LPARAM lParam);
 };
 
 
@@ -557,11 +593,11 @@ i64_t exMemory::GetSectionHeader(const ESECTIONHEADERS& section, i64_t* lpResult
 i64_t exMemory::GetProcAddress(const std::string& fnName, i64_t* lpResult)
 {
 	if (!IsValidInstance())
-		return 0; 
-	
+		return 0;
+
 	if (!GetProcAddressEx(vmProcess.hProc, vmProcess.dwModuleBase, fnName, lpResult))
 		return 0;
-	
+
 	return *lpResult;
 }
 
@@ -816,6 +852,54 @@ bool exMemory::GetProcessModulesEx(const DWORD& dwPID, std::vector<modInfo_t>& l
 	return list.size() > 0;
 }
 
+HWND exMemory::GetProcessWindowEx(const DWORD& dwPID)
+{
+	std::vector<wndwInfo_t> windows;
+
+	if (!GetProcessWindowsEx(dwPID, windows))
+		return nullptr;
+
+	const wndwInfo_t* best = nullptr;
+
+	for (const auto& window : windows)
+	{
+		if (!window.bVisible)
+			continue;
+
+		if (window.bOwned)
+			continue;
+
+		if (window.bToolWindow)
+			continue;
+
+		if (window.mWidth <= 0 || window.mHeight <= 0)
+			continue;
+
+		if (!best || window.GetArea() > best->GetArea())
+			best = &window;
+	}
+
+	return best ? best->hWnd : nullptr;
+}
+
+bool exMemory::GetProcessWindowsEx(const DWORD& dwPID, std::vector<wndwInfo_t>& windowList)
+{
+	windowList.clear();
+
+	if (!dwPID)
+		return false;
+
+	EnumWindowData data{};
+	data.procId = dwPID;
+	data.windowList = &windowList;
+
+	if (!EnumWindows(EnumProcessWindowsEx, reinterpret_cast<LPARAM>(&data)))
+		return false;
+
+	return !windowList.empty();
+
+}
+
 bool exMemory::FindProcessEx(const std::string& procName, procInfo_t* procInfo, const bool& bAttach, const DWORD& dwDesiredAccess)
 {
 	bool result = false;
@@ -865,10 +949,7 @@ bool exMemory::FindProcessEx(const std::string& procName, procInfo_t* procInfo, 
 		proc.dwAccessLevel = dwDesiredAccess;				//  desired access level
 
 		//  attempt to get main process window
-		EnumWindowData eDat;
-		eDat.procId = proc.dwPID;
-		if (EnumWindows(GetProcWindowEx, reinterpret_cast<LPARAM>(&eDat)))
-			proc.hWnd = eDat.hwnd;
+		proc.hWnd = GetProcessWindowEx(proc.dwPID);
 
 		//  Get window title
 		char buffer[MAX_PATH];
@@ -882,13 +963,13 @@ bool exMemory::FindProcessEx(const std::string& procName, procInfo_t* procInfo, 
 
 			proc.bAttached = proc.hProc != INVALID_HANDLE_VALUE;
 		}
-		
+
 		*procInfo = proc;
 
 		result = true;
 
 		CloseHandle(modSnap);
-		
+
 		break;
 	} while (Process32Next(hSnap, &procEntry));
 
@@ -1017,12 +1098,12 @@ bool exMemory::GetSectionHeaderAddressEx(const HANDLE& hProc, const i64_t& dwMod
 	std::string segment;
 	switch (section)
 	{
-		case ESECTIONHEADERS::SECTION_TEXT: { segment = ".text"; break; }
-		case ESECTIONHEADERS::SECTION_DATA: { segment = ".data"; break; }
-		case ESECTIONHEADERS::SECTION_RDATA: { segment = ".rdata"; break; }
-		case ESECTIONHEADERS::SECTION_IMPORT: { segment = ".idata"; break; }
-		case ESECTIONHEADERS::SECTION_EXPORT: { segment = ".edata"; break; }
-		default: return false;
+	case ESECTIONHEADERS::SECTION_TEXT: { segment = ".text"; break; }
+	case ESECTIONHEADERS::SECTION_DATA: { segment = ".data"; break; }
+	case ESECTIONHEADERS::SECTION_RDATA: { segment = ".rdata"; break; }
+	case ESECTIONHEADERS::SECTION_IMPORT: { segment = ".idata"; break; }
+	case ESECTIONHEADERS::SECTION_EXPORT: { segment = ".edata"; break; }
+	default: return false;
 	}
 	if (segment.empty())	//	segment title not captured ?? 
 		return false;
@@ -1140,38 +1221,38 @@ bool exMemory::FindPatternEx(const HANDLE& hProc, const i64_t& dwModule, const s
 		//	rip offset from instruction
 		switch (instruction)
 		{
-		case EASM::ASM_NULL: 
-		{ 
+		case EASM::ASM_NULL:
+		{
 			//	just return the address
-			result = address; 
-			break; 
+			result = address;
+			break;
 		}
 		case EASM::ASM_MOV: //	mov rax,[proc.exe+offset]	; 0x48 0x8B 0x05 ?? ?? ?? ??
-		{ 
-			const auto offset = ReadEx<int>(hProc, address + 3); 
+		{
+			const auto offset = ReadEx<int>(hProc, address + 3);
 			result = (address + offset) + 7;	// 7 = sizeof instruction
 			break;
-		}	
+		}
 		case EASM::ASM_CALL: //	call proc.exe+offset		; 0xE8 ?? ?? ?? ??
-		{ 
-			const auto offset = ReadEx<int>(hProc, address + 1); 
+		{
+			const auto offset = ReadEx<int>(hProc, address + 1);
 			result = (address + offset) + 5; 	// 5 = sizeof instruction
 			break;
-		}	
+		}
 		case EASM::ASM_LEA: //	lea rax,[proc.exe+offset]	; 0x48 0x8D 0x05 ?? ?? ?? ??
-		{ 
-			const auto offset = ReadEx<int>(hProc, address + 3); 
+		{
+			const auto offset = ReadEx<int>(hProc, address + 3);
 			result = (address + offset) + 7;	// 7 = sizeof instruction
 			break;
-		}	
+		}
 		case EASM::ASM_CMP: //	cmp rax,[proc.exe+offset]	; 0x48 0x3B 0x05 ?? ?? ?? ??
-		{ 
-			const auto offset = ReadEx<int>(hProc, address + 2); 
+		{
+			const auto offset = ReadEx<int>(hProc, address + 2);
 			result = (address + offset) + 6;	// 6 = sizeof instruction
 			break;
-		}	
+		}
 
-		default: 
+		default:
 			return false;
 		}
 
@@ -1287,20 +1368,43 @@ bool exMemory::LoadLibraryInjectorEx(const HANDLE& hProc, const std::string& dll
 //
 //-------------------------------------------------------------------------------------------------
 
-BOOL CALLBACK exMemory::GetProcWindowEx(HWND window, LPARAM lParam)
+BOOL CALLBACK exMemory::EnumProcessWindowsEx(HWND window, LPARAM lParam)
 {
-	auto data = reinterpret_cast<EnumWindowData*>(lParam);
+	auto* data = reinterpret_cast<EnumWindowData*>(lParam);
+	if (!data || !data->windowList)
+		return FALSE;
 
-	DWORD windowPID;
+	DWORD windowPID = 0;
 	GetWindowThreadProcessId(window, &windowPID);
+	if (windowPID != data->procId)
+		return TRUE;
 
-	bool isMainWindow = GetWindow(window, GW_OWNER) == (HWND)0 && IsWindowVisible(window);
-	if (windowPID != data->procId || !isMainWindow)
-		return true;
+	wndwInfo_t info{};
+	info.hWnd = window;
+	info.bVisible = IsWindowVisible(window);
+	info.bOwned = GetWindow(window, GW_OWNER) != nullptr;
 
-	data->hwnd = window;
+	const LONG_PTR exStyle = GetWindowLongPtrW(window, GWL_EXSTYLE);
+	info.bToolWindow = (exStyle & WS_EX_TOOLWINDOW) != 0;
 
-	return true;
+	RECT clientRect{};
+	if (GetClientRect(window, &clientRect))
+	{
+		info.mWidth = clientRect.right - clientRect.left;
+		info.mHeight = clientRect.bottom - clientRect.top;
+	}
+
+	char buffer[MAX_PATH]{};
+	if (GetWindowTextA(window, buffer, MAX_PATH))
+		info.mTitle = buffer;
+	memset(buffer, 0, sizeof(buffer));
+
+	if (GetClassNameA(window, buffer, MAX_PATH))
+		info.mClassName = buffer;
+
+	data->windowList->push_back(std::move(info));
+
+	return TRUE;
 }
 
 
