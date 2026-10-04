@@ -4,6 +4,8 @@
 //
 //  Lightweight utilities for process attachment, module enumeration,
 //  memory access, and process window management.
+// 
+// https://github.com/NightFyre/exMemory/tree/main
 // ============================================================================
 
 #pragma once
